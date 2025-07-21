@@ -1,0 +1,51 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Flutter Dev - Android/Web" ,
+        "request": "launch",
+        "type": "dart",
+        "flutterMode": "debug",
+        "program": "lib/main_dev.dart",
+        "args": [
+          "--flavor",
+          "dev",
+          "-t",
+          "lib/main_dev.dart"
+        ]
+    },
+      {
+      "name": "Flutter Prod - Android/Web",
+      "request": "launch",
+      "type": "dart",
+      "flutterMode": "debug",
+      "program": "lib/main_prod.dart",
+      "args": [
+        "--flavor",
+        "prod",
+        "-t",
+        "lib/main_prod.dart"
+      ]
+    },
+    {
+      "name": "Flutter DEV - Windows",
+      "type": "dart",
+      "request": "launch",
+      "program": "lib/main_dev.dart",
+      "args": [
+        "-d",
+        "windows"
+      ]
+    },
+    {
+      "name": "Flutter PROD - Windows",
+      "type": "dart",
+      "request": "launch",
+      "program": "lib/main_prod.dart",
+      "args": [
+        "-d",
+        "windows"
+      ]
+    }
+  ]
+}

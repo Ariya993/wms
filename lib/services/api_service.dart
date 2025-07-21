@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:get/get.dart';
 import 'package:wms/helper/endpoint.dart';
@@ -27,6 +28,8 @@ class ApiService extends GetxService {
       return true;
     } else {
       Get.snackbar("Error", " Refresh Token failed: ${response.statusCode}");
+       box.erase();
+          Get.offAllNamed('/login'); 
       return false;
     }
   }
@@ -76,14 +79,40 @@ class ApiService extends GetxService {
         Get.snackbar(
           "Error",
           "Gagal menyimpan akses menu pengguna: ${response.statusCode} - ${response.body}",
-          snackPosition: SnackPosition.TOP,
-        ); 
+         snackPosition: SnackPosition.TOP,snackStyle: SnackStyle.FLOATING,backgroundColor: Colors.redAccent, colorText: Colors.white);
+        
       }
     } catch (e) { 
       throw Exception('Network or server error: $e'); // Lempar exception umum
     } 
   }
+Future<List<Map<String, dynamic>>> getPickers() async {
+  try {
+    final response = await http.get(
+        Uri.parse(apiWarehouseWMS),
+        headers: _getHeaders(),
+      );
 
+      if (response.statusCode == 200) {
+        List<dynamic> data = json.decode(response.body);
+        return data.cast<Map<String, dynamic>>();
+      } else {
+        Get.snackbar(
+          "Error",
+          "Gagal mengambil data picker: ${response.statusCode}",
+        );
+        print("Response body: ${response.body}");
+        return [];
+      }
+  } catch (e) {
+    Get.snackbar(
+      "Error", "Gagal mengambil data picker",
+      backgroundColor: Colors.red,
+      colorText: Colors.white,
+    );
+    return [];
+  }
+}
   Future<List<Map<String, dynamic>>> getWarehouses() async {
     try {
       final response = await http.get(
@@ -144,11 +173,11 @@ class ApiService extends GetxService {
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        Get.snackbar("Sukses", "User berhasil ditambahkan!");
+        Get.snackbar("Success", "User created!",snackPosition: SnackPosition.TOP,snackStyle: SnackStyle.FLOATING,backgroundColor: Colors.green, colorText: Colors.white);
         return true;
       } else {
         final errorData = json.decode(response.body);
-        String errorMessage = "Terjadi kesalahan";
+        String errorMessage = "Error";
 
         if (errorData['errors'] != null) {
           // Ambil semua pesan error dari field 'errors'
@@ -160,12 +189,12 @@ class ApiService extends GetxService {
           errorMessage = errorData['message'];
         }
 
-        Get.snackbar("Gagal", errorMessage);
+        Get.snackbar("Error", errorMessage);
         print("Failed to create user: ${response.body}");
         return false;
       }
     } catch (e) {
-      Get.snackbar("Error", "Terjadi kesalahan saat membuat user: $e");
+      Get.snackbar("Error", "Failed to create user: $e");
       print("Error creating user: $e");
       return false;
     }
@@ -180,11 +209,11 @@ class ApiService extends GetxService {
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        Get.snackbar("Sukses", "User berhasil di update!");
+        Get.snackbar("Success", "User updated",snackPosition: SnackPosition.TOP,snackStyle: SnackStyle.FLOATING,backgroundColor: Colors.green, colorText: Colors.white);
         return true;
       } else {
         final errorData = json.decode(response.body);
-        String errorMessage = "Terjadi kesalahan";
+        String errorMessage = "Error";
 
         if (errorData['errors'] != null) {
           // Ambil semua pesan error dari field 'errors'
@@ -196,14 +225,108 @@ class ApiService extends GetxService {
           errorMessage = errorData['message'];
         }
 
-        Get.snackbar("Gagal", errorMessage);
+        Get.snackbar("Error", errorMessage);
         print("Failed to update user: ${response.body}");
         return false;
       }
     } catch (e) {
-      Get.snackbar("Error", "Terjadi kesalahan saat mengupdate user: $e");
+      Get.snackbar("Error", "Failed to updated user: $e");
       print("Error creating user: $e");
       return false;
     }
   }
+
+  Future<bool> SendFCM(String username,String platform,String title, String descr,String path) async {
+    try {
+      final body = jsonEncode({
+        "device": username, // Ambil username dari GetStorage
+        "title": title,
+        "message": descr,
+        "type": platform,
+        "path": path,
+      });
+
+      final response = await http.post(
+        Uri.parse(apiSendFCM), 
+        headers: {
+        "Content-Type": "application/json", 
+      },
+        body: body,
+      );
+      if (response.statusCode==204)
+      {
+        return true;
+      }
+      else
+      {
+        var a = json.decode(response.body);
+        print("Error creating user: $a");
+      return false;
+      }
+      
+       
+    } catch (e) {
+      Get.snackbar("Error", "Terjadi kesalahan saat: $e");
+      print("Error creating user: $e");
+      return false;
+    }
+  }
+  Future<bool> PostWarehouseAuth(Map<String, dynamic> userData) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$apiWarehouseWMS/auth'),
+        headers: _getHeaders(),
+        body: json.encode(userData),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+      
+        return true;
+      } else {
+        final errorData = json.decode(response.body);
+        String errorMessage = "Error";
+
+        if (errorData['errors'] != null) {
+          // Ambil semua pesan error dari field 'errors'
+          final errors = errorData['errors'] as Map<String, dynamic>;
+          errorMessage = errors.entries
+              .map((e) => "${e.key}: ${e.value.join(', ')}")
+              .join('\n');
+        } else if (errorData['message'] != null) {
+          errorMessage = errorData['message'];
+        }
+
+        Get.snackbar("Error", errorMessage);
+        print("Failed to submit authentication: ${response.body}");
+        return false;
+      }
+    } catch (e) {
+      Get.snackbar("Error", "Failed to submit authentication: $e");
+      print("Error creating user: $e");
+      return false;
+    }
+  } 
+  
+  Future<Map<String, dynamic>?> getWarehouseAuth(Map<String, dynamic> data) async {
+  try {
+     final response = await http.post(
+        Uri.parse('$apiWarehouseWMS/code'),
+        headers: _getHeaders(),
+        body:json.encode(data), 
+      );
+
+      if (response.statusCode == 200) {
+       Map<String, dynamic> data = json.decode(response.body);
+        return data;
+      } else { 
+        return null;
+      }
+  } catch (e) {
+    Get.snackbar('Error', 'Gagal load data auhorization: $e');
+    return null;
+  }
+}
+
+
+
 }

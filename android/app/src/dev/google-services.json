@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "408453120849",
+    "project_id": "dev-wms-mobile",
+    "storage_bucket": "dev-wms-mobile.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:408453120849:android:859417f559884a3c658970",
+        "android_client_info": {
+          "package_name": "com.sanymp.wms.dev"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD9xZooRgl4Z5pN22p0qU1yCDoijQx20DI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

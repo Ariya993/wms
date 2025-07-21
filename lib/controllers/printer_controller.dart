@@ -1,282 +1,421 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data'; 
-import 'package:blue_thermal_printer/blue_thermal_printer.dart';
-import 'package:flutter/foundation.dart';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:get_storage/get_storage.dart';
-import 'package:html_to_image/html_to_image.dart';
-import 'package:http/http.dart' as http;
-import 'package:image/image.dart' as img;
+import 'package:get_storage/get_storage.dart'; 
+import 'package:http/http.dart' as http; 
+import 'package:niimbot_label_printer/niimbot_label_printer.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:webview_flutter/webview_flutter.dart';
-import 'package:wms/helper/endpoint.dart'; 
-import 'dart:html' as html;
+import 'package:wms/helper/endpoint.dart';
+import 'package:image/image.dart' as img;
 class PrinterController extends GetxController {
-  final bluetooth = BlueThermalPrinter.instance;
+  final niimbot = NiimbotLabelPrinter();
+  WebViewController? webViewController;
+  final box = GetStorage();
+  final isConnected = false.obs;
   final devices = <BluetoothDevice>[].obs;
   final selectedDevice = Rx<BluetoothDevice?>(null);
-   WebViewController? webViewController;
-  final isConnected = false.obs;
-
-  final box = GetStorage();
-  final _selectedPrinterKey = 'selectedPrinterAddress';
- 
+  
+  final TextEditingController widthController = TextEditingController(
+    text: "5",
+  ); // mm
+  final TextEditingController heightController = TextEditingController(
+    text: "3",
+  ); // mm
+  final TextEditingController dpiController = TextEditingController(
+    text: "8",
+  ); // pixel per mm
   @override
   void onInit() {
     super.onInit();
-    initPrinter();
+    scanPrinter();
+      widthController.text = (box.read('label_width') ?? 5).toString();
+    heightController.text = (box.read('label_height') ?? 3).toString();
   }
-
-  /// 🔹 Print dari image Uint8List (biasanya dari preview API)
-  Future<void> printImageFromBytes(Uint8List imageBytes) async {
-    if (!isConnected.value) {
-      Get.snackbar("Failed", "Printer not found",snackPosition: SnackPosition.TOP,snackStyle: SnackStyle.FLOATING,backgroundColor: Colors.redAccent, colorText: Colors.white);
+Future<void> requestBluetoothPermissions() async {
+  if (await Permission.bluetoothConnect.isDenied ||
+      await Permission.bluetoothScan.isDenied ||
+      await Permission.locationWhenInUse.isDenied) {
+    await [
+      Permission.bluetoothConnect,
+      Permission.bluetoothScan,
+      Permission.locationWhenInUse,
+    ].request();
+  }
+}
+  Future<void> scanPrinter() async {
+    await requestBluetoothPermissions();
+    final isGranted = await niimbot.requestPermissionGrant();
+    if (!isGranted) {
+      Get.snackbar(
+        "Permission",
+        "Bluetooth permission denied",
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
       return;
     }
 
-    try {
-      final decoded = img.decodeImage(imageBytes);
-      if (decoded == null) throw Exception("Gagal decode gambar");
-
-      await bluetooth.printNewLine();
-      await bluetooth.printImageBytes(img.encodeJpg(decoded));
-      await bluetooth.printNewLine();
-      await bluetooth.paperCut();
-    } catch (e) {
-      Get.snackbar("Print Error", "Gagal print gambar: $e",snackPosition: SnackPosition.TOP,snackStyle: SnackStyle.FLOATING,backgroundColor: Colors.redAccent, colorText: Colors.white);
+    final isEnabled = await niimbot.bluetoothIsEnabled();
+    if (!isEnabled) {
+      Get.snackbar(
+        "Bluetooth",
+        "Bluetooth is not enabled",
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+      return;
     }
+
+    final foundDevices = await niimbot.getPairedDevices(); // ✅ gunakan ini
+    if (foundDevices.isEmpty) {
+      Get.snackbar(
+        "Scan",
+        "No printer found",
+        backgroundColor: Colors.orange,
+        colorText: Colors.white,
+      );
+    }
+    devices.assignAll(foundDevices);
+
+    // final savedAddress = box.read('last_printer_address');
+    // if (savedAddress != null && selectedDevice.value == null) {
+    //   final matchedDevice = foundDevices.firstWhereOrNull(
+    //     (d) => d.address == savedAddress,
+    //   );
+
+    //   if (matchedDevice != null) {
+    //     debugPrint("Trying auto-reconnect to ${matchedDevice.name}");
+    //     await connectPrinter(matchedDevice);
+    //   }
+    // }
   }
 
- Future<Uint8List?> getBarcodeImageFromServer({
-  required String itemCode,
-  required String itemName,
-  required int qty,
-}) {
-  final token = box.read('token');
+  Future<void> connectPrinter(BluetoothDevice device) async {
+    final result = await niimbot.connect(device);
+    final status = await niimbot.isConnected(); // <-- tambahkan ini
+  isConnected.value = status;
+    if (result) {
+      isConnected.value = true;
+      selectedDevice.value = device;
+      Get.snackbar(
+        "Printer",
+        "Connected to ${device.name}",
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+      );
+    } else {
+      Get.snackbar(
+        "Printer",
+        "Failed to connect",
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    }
+    // final savedAddress = box.read('last_printer');
+    // if (savedAddress != null) {
+    //   final matchingDevice = devices.firstWhereOrNull(
+    //     (d) => d.address == savedAddress,
+    //   );
+    //   if (matchingDevice != null) {
+    //     final result = await niimbot.connect(matchingDevice);
+    //     if (result) {
+    //       isConnected.value = true;
+    //       selectedDevice.value = matchingDevice;
+    //       Get.snackbar(
+    //         "Printer",
+    //         "Reconnected to ${matchingDevice.name}",
+    //         backgroundColor: Colors.green,
+    //         colorText: Colors.white,
+    //       );
+    //     } else {
+    //       isConnected.value = false;
+    //       selectedDevice.value = null;
+    //       box.write('last_printer_address', null);
+    //       Get.snackbar(
+    //         "Printer",
+    //         "Failed to connect",
+    //         backgroundColor: Colors.red,
+    //         colorText: Colors.white,
+    //       );
+    //     }
+    //   }
+    // } else {
+    //   final result = await niimbot.connect(device);
+    //   final status = await niimbot.isConnected(); // <-- tambahkan ini
+    //   if (result && status) {
+    //     isConnected.value = true;
+    //     selectedDevice.value = device;
+    //     box.write('last_printer_address', device.address);
+    //     Get.snackbar(
+    //       "Printer",
+    //       "Connected to ${device.name}",
+    //       backgroundColor: Colors.green,
+    //       colorText: Colors.white,
+    //     );
+    //   } else {
+    //     isConnected.value = false;
+    //     selectedDevice.value = null;
+    //     box.write('last_printer_address', null);
+    //     Get.snackbar(
+    //       "Printer",
+    //       "Failed to connect",
+    //       backgroundColor: Colors.red,
+    //       colorText: Colors.white,
+    //     );
+    //   }
+    // }
+  }
 
-  final url = "$apiBarcodeWMS?qty=$qty";
-  final body = {
-    "ItemCode": itemCode,
-    "ItemName": itemName,
-  };
-  
-  return http
-      .post(
-        Uri.parse(url),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode(body),
-      )
-      .then((response) {
-       
-        if (response.statusCode == 200) {
-          return response.bodyBytes; // Langsung kembalikan bytes 
-        } else { 
-          Get.snackbar("Error", "Failed get barcode: ${response.statusCode}",snackPosition: SnackPosition.TOP,snackStyle: SnackStyle.FLOATING,backgroundColor: Colors.redAccent, colorText: Colors.white);
-          return null;
-        }
-      })
-      .catchError((e, stacktrace) { 
-        Get.snackbar("Error", "Exception barcode:\n$e",snackPosition: SnackPosition.TOP,snackStyle: SnackStyle.FLOATING,backgroundColor: Colors.redAccent, colorText: Colors.white);
-        return null;
-      });
-}
+  Future<void> disconnectPrinter() async {
+    await niimbot.disconnect();
+    isConnected.value = false;
+    selectedDevice.value = null;
+  }
 
-Future<String?> getBarcodeHtmlFromServer({
-  required String itemCode,
-  required String itemName,
-  required int qty,
-  double cmWidth = 5,
-  double cmHeight = 3,
-}) {
-  final token = box.read('token');
+  Future<Uint8List?> getBarcodeImageFromServer({
+    required String itemCode,
+    required String itemName,
+      required int qty,
+    double cmWidth = 5,
+    double cmHeight = 3,
+  }) {
+    final token = box.read('token');
+    box.write('label_width', cmWidth);
+     box.write('label_height', cmHeight); 
+     final url =
+        "$apiBarcodeWMS?qty=$qty&cm_width=$cmWidth&cm_height=$cmHeight";
+    final body = {"itemCode": itemCode, "itemName": itemName};
 
-  final url =
-      "$apiBarcodeWMS/QRHtml?qty=$qty&cm_width=$cmWidth&cm_height=$cmHeight";
-
-  final body = {
-    "ItemCode": itemCode,
-    "ItemName": itemName,
-  };
-
-  return http
-      .post(
-        Uri.parse(url),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode(body),
-      )
-      .then((response) {
-        if (response.statusCode == 200) {
-          return response.body; // HTML string
-        } else {
+    return http
+        .post(
+          Uri.parse(url),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+          body: jsonEncode(body),
+        )
+        .then((response) {
+          if (response.statusCode == 200) {
+            return response.bodyBytes; // Langsung kembalikan bytes
+          } else {
+            Get.snackbar(
+              "Error",
+              "Failed get barcode: ${response.statusCode}",
+              snackPosition: SnackPosition.TOP,
+              snackStyle: SnackStyle.FLOATING,
+              backgroundColor: Colors.redAccent,
+              colorText: Colors.white,
+            );
+            return null;
+          }
+        })
+        .catchError((e, stacktrace) {
+           print("ERROR getBarcodeImageFromServer: $e");
+  print("STACKTRACE: $stacktrace");
           Get.snackbar(
             "Error",
-            "Failed get HTML barcode: ${response.statusCode}",
+            "Exception barcode:\n$e",
             snackPosition: SnackPosition.TOP,
             snackStyle: SnackStyle.FLOATING,
             backgroundColor: Colors.redAccent,
             colorText: Colors.white,
           );
           return null;
-        }
-      })
-      .catchError((e) {
+        });
+  }
+
+  Future<String?> getBarcodeHtmlFromServer({
+    required String itemCode,
+    required String itemName,
+    required int qty,
+    double cmWidth = 5,
+    double cmHeight = 3,
+  }) {
+    final token = box.read('token');
+
+    final url =
+        "$apiBarcodeWMS/QRHtml?qty=$qty&cm_width=$cmWidth&cm_height=$cmHeight";
+
+    final body = {"ItemCode": itemCode, "ItemName": itemName};
+
+    return http
+        .post(
+          Uri.parse(url),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+          body: jsonEncode(body),
+        )
+        .then((response) {
+          if (response.statusCode == 200) {
+            return response.body; // HTML string
+          } else {
+            Get.snackbar(
+              "Error",
+              "Failed get HTML barcode: ${response.statusCode}",
+              snackPosition: SnackPosition.TOP,
+              snackStyle: SnackStyle.FLOATING,
+              backgroundColor: Colors.redAccent,
+              colorText: Colors.white,
+            );
+            return null;
+          }
+        })
+        .catchError((e) {
+          Get.snackbar(
+            "Error",
+            "Exception barcode:\n$e",
+            snackPosition: SnackPosition.TOP,
+            snackStyle: SnackStyle.FLOATING,
+            backgroundColor: Colors.redAccent,
+            colorText: Colors.white,
+          );
+          return null;
+        });
+  }
+
+  Future<ui.Image> decodeToUiImage(Uint8List bytes) {
+    final Completer<ui.Image> completer = Completer();
+    ui.decodeImageFromList(bytes, (ui.Image img) {
+      completer.complete(img);
+    });
+    return completer.future;
+  }
+  void printImage(Uint8List  html) async {
+    try {
+      final isConnected = await niimbot.isConnected();
+      if (!isConnected) {
         Get.snackbar(
-          "Error",
-          "Exception barcode:\n$e",
-          snackPosition: SnackPosition.TOP,
-          snackStyle: SnackStyle.FLOATING,
-          backgroundColor: Colors.redAccent,
+          "Printer",
+          "Not connected",
+          backgroundColor: Colors.red,
           colorText: Colors.white,
         );
-        return null;
+        //return;
+      } 
+ 
+      final Completer<ui.Image> completer = Completer();
+      ui.decodeImageFromList(html, (ui.Image img) {
+        completer.complete(img);
       });
-}
+      final ui.Image image = await completer.future;
 
+      final ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+      final List<int> bytesImage = byteData!.buffer.asUint8List().toList();
+      print(image.height); 
+      print('----------------');
+      print(image.width);
+      
 
-Future<void> printBarcodeFromServer({
-  required String itemCode,
-  required String itemName,
-  required int qty,
-}) async {
-  if (!isConnected.value) {
-    Get.snackbar("Failed", "Printer not connected",snackPosition: SnackPosition.TOP,snackStyle: SnackStyle.FLOATING,backgroundColor: Colors.redAccent, colorText: Colors.white);
-    return;
-  }
-  final token = box.read('token');
-  try {
-    final response = await http.post(
-      Uri.parse("$apiBarcodeWMS?qty=$qty"),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token', // optional if secured
-      },
-      body: jsonEncode({
-        "itemCode": itemCode,
-        "itemName": itemName,
-      }),
-    );
-
-    if (response.statusCode != 200) {
-      throw Exception("Gagal ambil barcode: ${response.statusCode}");
-    }
-
-    final Uint8List imageBytes = response.bodyBytes;
-
-    // Konversi PNG ke format bitmap printer
-    final img.Image? image = img.decodeImage(imageBytes);
-    if (image == null) throw Exception("Gagal decode image");
-
-    await bluetooth.printNewLine();
-    await bluetooth.printImageBytes(img.encodeJpg(image)); // atau encodeBmp(image)
-    await bluetooth.printNewLine();
-    await bluetooth.paperCut();
-
-  } catch (e) {
-    Get.snackbar("Print Error", "$e");
-  }
-}
-
-  Future<void> initPrinter() async {
-    try {
-      bool connected = await bluetooth.isConnected ?? false;
-      isConnected.value = connected;
-
-      final bondedDevices = await bluetooth.getBondedDevices();
-      devices.assignAll(bondedDevices);
-
-      // Coba auto-select printer terakhir
-      final savedAddress = box.read(_selectedPrinterKey);
-      if (savedAddress != null) {
-        final matchedDevice = bondedDevices.firstWhereOrNull(
-          (d) => d.address == savedAddress,
+      final printData = PrintData.fromMap({
+        "bytes": bytesImage,
+        "width": image.width,
+        "height": image.height,
+        "rotate": false,
+        "invertColor": false,
+        "density": 3,
+        "labelType": 1,
+      });  
+      final result = await niimbot.send(printData);
+      if (result) {
+        Get.snackbar(
+          "Printer",
+          "Printed successfully",
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
         );
-        if (matchedDevice != null) {
-          selectedDevice.value = matchedDevice;
-        }
+      } else {
+        Get.snackbar(
+          "Printer",
+          "Print failed",
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
       }
     } catch (e) {
-      Get.snackbar("Printer Error", "Failed to initialize printer: $e",snackPosition: SnackPosition.TOP,snackStyle: SnackStyle.FLOATING,backgroundColor: Colors.redAccent, colorText: Colors.white);
+      Get.snackbar(
+        "Print Error",
+        '$e',
+        snackPosition: SnackPosition.TOP,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
     }
   }
-
-  Future<void> connect(BluetoothDevice device) async {
+ void printQR(Uint8List imageBytes) async {
     try {
-      await bluetooth.connect(device);
-      selectedDevice.value = device;
-      isConnected.value = true;
-      box.write(_selectedPrinterKey, device.address); // Simpan alamat
-      Get.snackbar("Printer", "Connected to ${device.name}",snackPosition: SnackPosition.TOP,snackStyle: SnackStyle.FLOATING,backgroundColor: Colors.redAccent, colorText: Colors.white);
-    } catch (e) {
-      Get.snackbar("Printer", "Failed to connect: $e",snackPosition: SnackPosition.TOP,snackStyle: SnackStyle.FLOATING,backgroundColor: Colors.redAccent, colorText: Colors.white);
-    }
-  }
+      final isConnected = await niimbot.isConnected();
+      if (!isConnected) {
+        Get.snackbar(
+          "Printer",
+          "Not connected",
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+        //return;
+      } 
 
-  Future<void> disconnect() async {
-    try {
-      await bluetooth.disconnect();
-      isConnected.value = false;
-      Get.snackbar("Printer", "Disconnected",snackPosition: SnackPosition.TOP,snackStyle: SnackStyle.FLOATING,backgroundColor: Colors.redAccent, colorText: Colors.white);
-    } catch (e) {
-      Get.snackbar("Printer", "Failed to disconnect: $e",snackPosition: SnackPosition.TOP,snackStyle: SnackStyle.FLOATING,backgroundColor: Colors.redAccent, colorText: Colors.white);
-    }
-  }
+      final double widthCm = 5; // misalnya
+      final double heightCm = 3;
+      final double dpi = 8 * 10; // 8 pixel per mm = 80 per cm
 
-  // Optional: Reset pilihan printer
-  void clearSavedPrinter() {
-    box.remove(_selectedPrinterKey);
-    selectedDevice.value = null;
-  } 
-  
-  Future<void> printHtml(String html) async {
-    final Uint8List imageBytes =  await HtmlToImage.convertToImage(content: html,);
+      final int width = (widthCm * dpi).toInt();
+      final int height = (heightCm * dpi).toInt();
+       
+      final Completer<ui.Image> completer = Completer();
+      ui.decodeImageFromList(imageBytes, (ui.Image img) {
+        completer.complete(img);
+      });
+      final ui.Image image = await completer.future;
+      //final ui.Image image = await decodeToUiImage(imageBytes);
 
-    // Konversi PNG ke format bitmap printer
-    final img.Image? image = img.decodeImage(imageBytes);
-    if (image == null) throw Exception("Gagal decode image");
+      final ByteData? byteData = await image.toByteData();
+      //final ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
 
-    await bluetooth.printNewLine();
-    await bluetooth.printImageBytes(img.encodeJpg(image)); // atau encodeBmp(image)
-    await bluetooth.printNewLine();
-    await bluetooth.paperCut(); 
-
-
-  // if (kIsWeb) {
-  //   // Web: Open new tab and trigger browser print
-  //   // final newWindow = html.replaceAll('"', '\\"'); // Escape double quotes
-  //   // final js = '''
-  //   //   var printWindow = window.open('', '_blank');
-  //   //   printWindow.document.open();
-  //   //   printWindow.document.write("$newWindow");
-  //   //   printWindow.document.close();
-  //   //   printWindow.print();
-  //   // '''; 
-  // final newWindow = html.open('', '_blank');
-  // newWindow.document.write(html);
-  // newWindow.document.close();
-  // newWindow.print();
-
-  // } else if (Platform.isAndroid) {
-  //   final Uint8List imageBytes =  await HtmlToImage.convertToImage(content: html,);
-
-  //   // Konversi PNG ke format bitmap printer
-  //   final img.Image? image = img.decodeImage(imageBytes);
-  //   if (image == null) throw Exception("Gagal decode image");
-
-  //   await bluetooth.printNewLine();
-  //   await bluetooth.printImageBytes(img.encodeJpg(image)); // atau encodeBmp(image)
-  //   await bluetooth.printNewLine();
-  //   await bluetooth.paperCut(); 
-  // }  
-}
-
+      final List<int> bytesImage = byteData!.buffer.asUint8List().toList();
  
-
-
+  
+print("Image Width: ${image.width}, Height: ${image.height}");
+      final printData = PrintData.fromMap({
+         "bytes": bytesImage, // atau rgba
+        "width": image.width,
+        "height": image.height,
+        "rotate": false,
+        "invertColor": false,
+        "density": 3,
+        "labelType": 1,
+      });  
+      final result = await niimbot.send(printData);
+      if (result) {
+        Get.snackbar(
+          "Printer",
+          "Printed successfully",
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+        );
+      } else {
+        Get.snackbar(
+          "Printer",
+          "Print failed",
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+      }
+    } catch (e) {
+      Get.snackbar(
+        "Print Error",
+        '$e',
+        snackPosition: SnackPosition.TOP,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    }
+  }
 }

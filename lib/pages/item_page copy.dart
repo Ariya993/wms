@@ -560,9 +560,9 @@ class ItemPage extends StatelessWidget {
                                     return;
                                   }
 
-                                  await printerController
-                                      .printImageFromBytes(
-                                          previewImage.value!);
+                                  // await printerController
+                                  //     .printImageFromBytes(
+                                  //         previewImage.value!);
                                   Get.back();
                                 },
                               ),

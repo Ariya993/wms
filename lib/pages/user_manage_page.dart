@@ -29,7 +29,8 @@ class UserManagePage extends StatelessWidget {
           
           controller.nameController.text = userData!['nama'] ?? '';
           controller.passwordController.text = '';
-
+        controller.emailController.text = userData!['email'] ?? '';
+        controller.phoneController.text = userData!['phone'] ?? '';
           final warehouse = controller.warehouses.firstWhereOrNull(
             (w) => w['warehouseCode'] == userData!['warehouse_code'],
           );
@@ -81,7 +82,18 @@ class UserManagePage extends StatelessWidget {
                 // ),
               ),
               const SizedBox(height: 10),
-              
+              CustomTextField(
+                controller: controller.emailController,
+                labelText: "Email",
+                hintText: "Fill the email ", 
+              ),
+               const SizedBox(height: 10),
+              CustomTextField(
+                controller: controller.phoneController,
+                labelText: "Phone Number",
+                hintText: "Fill the phone number ", 
+              ),
+                const SizedBox(height: 10),
               CustomDropdownSearch<Map<String, dynamic>>(
                 labelText: "Atasan",
                 selectedItem: controller.selectedSuperior.value,

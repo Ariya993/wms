@@ -7,7 +7,10 @@ import 'package:get_storage/get_storage.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'firebase_options.dart';
+import 'firebase_options_prod.dart' as prod_options;
+import 'firebase_options_dev.dart' as dev_options;
+// import 'firebase_options_prod.dart' as prod_options;
+
 import 'routes/app_routes.dart';
 import 'pages/login_page.dart';
 import 'pages/home_page.dart';
@@ -16,16 +19,28 @@ import 'package:wms/services/sap_service.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart'; 
-
+ 
+// import 'package:printing/printing.dart';
 //import 'splashscreen_page.dart';
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
+enum Environment { dev, prod }
 
-Future<void> main() async {
+late final Environment appEnvironment;
+
+Future<void> mainCommon(Environment  env) async {
+   appEnvironment = env;
   WidgetsFlutterBinding.ensureInitialized();
   await GetStorage.init();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform); 
+  // await Printing.init();
+  // await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform); 
+  await Firebase.initializeApp(
+  options: env == Environment.dev
+      ? dev_options.DefaultFirebaseOptions.currentPlatform
+      : prod_options.DefaultFirebaseOptions.currentPlatform,
+);
+
  
 
   if (!kIsWeb && Platform.isAndroid) {
@@ -39,12 +54,15 @@ Future<void> main() async {
 
   await _initializeNotifications();
   await _setupInteractedMessage();
-
-  runApp(const MyApp());
+  
+  runApp(MyApp(env: env));
+  //runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+   final Environment env;
+  const MyApp({super.key, required this.env});
+  // const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -61,12 +79,57 @@ class MyApp extends StatelessWidget {
 
     return GetMaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'WMS App',
+      title: (env==Environment.dev ? 'DEV WMS Apps' :'WMS Apps'),
       home: token != null ? HomePage() : LoginPage(),
       //  home: const SplashScreenPage(),
+      // theme: ThemeData(
+      //   colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue.shade700),
+      //   useMaterial3: true,
+      // ),
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue.shade700),
-        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.blueAccent, // Warna dasar untuk menghasilkan palet
+          primary: Colors.blue[700],    // Warna primer utama
+          secondary: Colors.lightBlue[400], // Warna sekunder
+          tertiary: Colors.teal[400], // Warna ketiga (opsional)
+          surface: Colors.white,       // Warna untuk permukaan widget (Card, dll.)
+          onPrimary: Colors.white,     // Warna teks di atas primary
+          onSurface: Colors.grey[800], // Warna teks di atas surface
+          error: Colors.redAccent,     // Warna untuk pesan error
+        ),
+        useMaterial3: true, // AKTIFKAN MATERIAL 3 DESIGN
+        appBarTheme: AppBarTheme(
+          backgroundColor: Colors.blue[700], // Warna AppBar
+          foregroundColor: Colors.white,     // Warna teks dan ikon di AppBar
+          elevation: 2, // Shadow di bawah AppBar
+          centerTitle: true,
+        ), 
+        // elevatedButtonTheme: ElevatedButtonThemeData(
+        //   style: ElevatedButton.styleFrom(
+        //     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        //     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        //     textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        //   ),
+        // ),
+        snackBarTheme: SnackBarThemeData(
+          behavior: SnackBarBehavior.floating, // Snackbar muncul di atas FAB
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          contentTextStyle: const TextStyle(color: Colors.white),
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide.none, // Default tanpa border
+          ),
+          filled: true, // Selalu diisi
+          fillColor: Colors.grey[100], // Warna fill default
+          contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+          // hintStyle: TextStyle(color: Colors.grey[500]),
+        ),
+        listTileTheme: ListTileThemeData(
+          tileColor: Colors.white, // Warna latar belakang ListTile
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), // Sudut melengkung
+        )
       ),
       getPages: AppRoutes.routes,
     );

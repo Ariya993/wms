@@ -1,21 +1,138 @@
 import 'dart:io';
-import 'dart:typed_data';
-import 'dart:ui_web' as ui;
-import 'dart:html' as html;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:webview_flutter/webview_flutter.dart';
+import 'package:get_storage/get_storage.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import '../controllers/item_controller.dart';
+// import '../controllers/print_qr_web_controller.dart';
+// import '../helper/print_qr_stub.dart';
 import '../controllers/printer_controller.dart';
+import '../controllers/print_qr_controller.dart';
 import '../widgets/loading.dart';
 
-class ItemPage extends StatelessWidget {
+class BarcodeScannerPage extends StatefulWidget {
+  const BarcodeScannerPage({super.key});
+
+  @override
+  State<BarcodeScannerPage> createState() => _BarcodeScannerPageState();
+}
+
+class _BarcodeScannerPageState extends State<BarcodeScannerPage> {
+  final MobileScannerController cameraController = MobileScannerController();
+  bool _isFlashOn = false;
+  bool _isFrontCamera = false;
+  bool _isScanned = false;
+
+  @override
+  void dispose() {
+    cameraController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text(
+          'Scan QR/Barcode',
+          style: TextStyle(color: Colors.white),
+        ),
+        backgroundColor: Colors.blue.shade700,
+        iconTheme: const IconThemeData(color: Colors.white),
+        actions: [
+          IconButton(
+            icon: Icon(
+              _isFlashOn ? Icons.flash_on : Icons.flash_off,
+              color: _isFlashOn ? Colors.yellow : Colors.white,
+            ),
+            onPressed: () {
+              cameraController.toggleTorch();
+              setState(() {
+                _isFlashOn = !_isFlashOn;
+              });
+            },
+          ),
+          IconButton(
+            icon: Icon(_isFrontCamera ? Icons.camera_front : Icons.camera_rear),
+            onPressed: () {
+              cameraController.switchCamera();
+              setState(() {
+                _isFrontCamera = !_isFrontCamera;
+              });
+            },
+          ),
+        ],
+      ),
+      body: Stack(
+        children: [
+          MobileScanner(
+            controller: cameraController,
+            onDetect: (capture) {
+              if (_isScanned) return;
+              _isScanned = true;
+              final barcode = capture.barcodes.first;
+              final code = barcode.rawValue;
+              if (code != null && code.isNotEmpty) {
+                Get.back(result: code);
+              } else {
+                _isScanned = false;
+              }
+            },
+          ),
+          Align(
+            alignment: Alignment.center,
+            child: Container(
+              width: 250,
+              height: 250,
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.red, width: 3),
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: Container(
+              padding: const EdgeInsets.only(bottom: 20),
+              child: const Text(
+                'Arahkan QR/Barcode ke dalam bingkai',
+                style: TextStyle(color: Colors.white, fontSize: 18),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class ItemPage extends StatefulWidget {
+  const ItemPage({super.key});
+
+  @override
+  State<ItemPage> createState() => _ItemPageState();
+}
+
+class _ItemPageState extends State<ItemPage>
+    with TickerProviderStateMixin {
   final ItemController itemController = Get.put(ItemController());
   final PrinterController printerController = Get.put(PrinterController());
   final ScrollController scrollController = ScrollController();
-
-  ItemPage({super.key});
+  final printQRController = PrintQRController();
+  final box = GetStorage();
+  // ItemPage({super.key});
+  @override
+  void initState() {
+    super.initState(); 
+  }
+   Future<void> _navigateToScanner() async {
+    final result = await Get.to(() => const BarcodeScannerPage());
+    if (result != null && result is String && result.isNotEmpty) {
+       itemController.searchQuery.value = result.trim();
+                      itemController.fetchItems();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -98,12 +215,30 @@ class ItemPage extends StatelessWidget {
             child: Obx(() {
               if (itemController.isLoading.value &&
                   itemController.items.isEmpty) {
-                return const Center(child: CircularProgressIndicator());
+                // return const Center(child: CircularProgressIndicator());
+                return const Loading();
               }
 
               if (itemController.items.isEmpty &&
                   !itemController.isLoading.value) {
-                return const Center(child: Text("Tidak ada item ditemukan."));
+                 return const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.inventory,
+                          color: Colors.grey,
+                          size: 60,
+                        ),
+                        SizedBox(height: 10),
+                        Text(
+                          'No data Item.',
+                          style: TextStyle(color: Colors.grey, fontSize: 18),
+                        ),
+                      ],
+                    ),
+                  );      
+                // return const Center(child: Text("Tidak ada item ditemukan."));
               }
 
               return LayoutBuilder(
@@ -147,10 +282,13 @@ class ItemPage extends StatelessWidget {
                         final item = itemController.items[index];
                         final String itemCode = item['ItemCode'] ?? '';
                         final String itemName = item['ItemName'] ?? '';
+                        final String? binLoc = item['lokasi'] ?? '-';
                         final int stockOnHand =
-                            (item['QuantityOnStock'] ?? 0.0).toInt();
+                            (item['InStock'] ?? 0.0).toInt();
                         final int stockCommitted =
-                            (item['QuantityOrderedByCustomers'] ?? 0.0).toInt();
+                            (item['Committed'] ?? 0.0).toInt();
+                        final int stockOrdered =
+                            (item['Ordered'] ?? 0.0).toInt();
 
                         return Card(
                           shape: RoundedRectangleBorder(
@@ -198,7 +336,7 @@ class ItemPage extends StatelessWidget {
                                 Expanded(
                                   // ✅ Expanded to allow flexible content height
                                   child: Padding(
-                                    padding: const EdgeInsets.all(12),
+                                    padding: const EdgeInsets.all(10),
                                     child: Column(
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
@@ -230,13 +368,23 @@ class ItemPage extends StatelessWidget {
                                           children: [
                                             _stockRow(
                                               "Stock On Hand",
-                                              stockOnHand,
+                                              stockOnHand.toString(),
                                               Colors.green[100]!,
                                             ),
                                             _stockRow(
                                               "Stock Committed",
-                                              stockCommitted,
+                                              stockCommitted.toString(),
                                               Colors.orange[100]!,
+                                            ),
+                                            _stockRow(
+                                              "Stock Ordered",
+                                              stockOrdered.toString(),
+                                              Colors.blue[100]!,
+                                            ),
+                                            _stockRow(
+                                              "Bin Location",
+                                              binLoc.toString().toUpperCase(),
+                                              Colors.blueGrey[100]!,
                                             ),
                                           ],
                                         ),
@@ -246,43 +394,101 @@ class ItemPage extends StatelessWidget {
 
                                         // Print Button - Aligned to bottom right
                                         Align(
-                                          alignment:
-                                              Alignment
-                                                  .bottomRight, // Explicitly align to bottom right
-                                          child: ElevatedButton.icon(
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: Colors.blue[50],
-                                              foregroundColor: Colors.blue,
-                                              elevation: 1,
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 18,
-                                                    vertical: 12,
+                                          alignment: Alignment.bottomRight,
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              ElevatedButton.icon(
+                                                icon: const Icon(
+                                                  Icons.edit_location_alt,
+                                                  size: 18,
+                                                ),
+                                                label: const Text(
+                                                  "Edit Bin",
+                                                ),
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor:
+                                                      Colors.orange[50],
+                                                  foregroundColor:
+                                                      Colors.orange[800],
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        horizontal: 14,
+                                                        vertical: 10,
+                                                      ),
+                                                  side: const BorderSide(
+                                                    color: Colors.orange,
                                                   ),
-                                              side: const BorderSide(
-                                                color: Colors.blue,
-                                                width: 1,
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          10,
+                                                        ),
+                                                  ),
+                                                ),
+                                                onPressed: () {
+                                                  _showEditLokasiDialog(
+                                                    item['ItemCode'],
+                                                    item['WarehouseCode'],
+                                                  );
+                                                },
                                               ),
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(10),
-                                              ),
-                                              textStyle: const TextStyle(
-                                                fontSize: 13,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
-                                            icon: const Icon(
-                                              Icons.print,
-                                              size: 18,
-                                            ),
-                                            label: const Text("Print"),
-                                            onPressed: () {
-                                              _showPrintDialog(
-                                                itemName,
-                                                itemCode,
-                                              );
-                                            },
+                                              const SizedBox(width: 8),
+                                              ElevatedButton.icon(
+                                                  icon: const Icon(Icons.print, size: 18),
+                                                  label: const Text("Print"),
+                                                  style: ElevatedButton.styleFrom(
+                                                    backgroundColor: Colors.blue[50],
+                                                    foregroundColor: Colors.blue[700],
+                                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                                    side: const BorderSide(color: Colors.blue),
+                                                    shape: RoundedRectangleBorder(
+                                                      borderRadius: BorderRadius.circular(10),
+                                                    ),
+                                                  ),
+                                                  onPressed: () {
+                                                    _showPrintTypeDialog(
+                                                      item['ItemName'] ?? '',
+                                                      item['ItemCode'] ?? '',
+                                                      item['lokasi'] ?? '', // lokasi BIN (kalau ada)
+                                                    );
+                                                  },
+                                                ),
+
+                                              // ElevatedButton.icon(
+                                              //   icon: const Icon(
+                                              //     Icons.print,
+                                              //     size: 18,
+                                              //   ),
+                                              //   label: const Text("Print"),
+                                              //   style: ElevatedButton.styleFrom(
+                                              //     backgroundColor:
+                                              //         Colors.blue[50],
+                                              //     foregroundColor:
+                                              //         Colors.blue[700],
+                                              //     padding:
+                                              //         const EdgeInsets.symmetric(
+                                              //           horizontal: 14,
+                                              //           vertical: 10,
+                                              //         ),
+                                              //     side: const BorderSide(
+                                              //       color: Colors.blue,
+                                              //     ),
+                                              //     shape: RoundedRectangleBorder(
+                                              //       borderRadius:
+                                              //           BorderRadius.circular(
+                                              //             10,
+                                              //           ),
+                                              //     ),
+                                              //   ),
+                                              //   onPressed: () {
+                                              //     _showPrintDialog(
+                                              //       item['ItemName'],
+                                              //       item['ItemCode'],
+                                              //     );
+                                              //   },
+                                              // ),
+                                            ],
                                           ),
                                         ),
                                       ],
@@ -314,10 +520,18 @@ class ItemPage extends StatelessWidget {
           ),
         ],
       ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _navigateToScanner,
+        label: const Text("Scan QR"),
+        icon: const Icon(Icons.qr_code_scanner),
+        backgroundColor: Colors.blue.shade600,
+        foregroundColor: Colors.white,
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 
-  Widget _stockRow(String title, int value, Color color) {
+  Widget _stockRow(String title, String value, Color color) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 2),
       child: Row(
@@ -337,10 +551,154 @@ class ItemPage extends StatelessWidget {
     );
   }
 
+  void _showEditLokasiDialog(String? itemCode, String? warehouseCode) {
+    final TextEditingController lokasiController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    Get.dialog(
+      Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  "Update Bin",
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blueGrey,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: lokasiController,
+                  decoration: const InputDecoration(
+                    labelText: "New Bin Location",
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return "Input Location";
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.grey[300],
+                          foregroundColor: Colors.black,
+                        ),
+                        onPressed: () => Get.back(),
+                        child: const Text("Close"),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton.icon( 
+                        label: const Text("Update"),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          foregroundColor: Colors.white,
+                        ),
+                        onPressed: () async {
+                          if (formKey.currentState!.validate()) {
+                           final success = await itemController.updateBinLocation(
+                              itemCode: itemCode ?? '',
+                              warehouseCode: warehouseCode ?? '',
+                              lokasiBaru: lokasiController.text.trim(),
+                            );
+                            if (success) {
+                              Get.back(); // Tutup dialog input lokasi
+ 
+                               Get.snackbar(
+                                    "Success",
+                                    "Bin loccation updated",
+                                    backgroundColor: Colors.green,
+                                    colorText: Colors.white,
+                                  );
+                              // Delay sedikit biar snackbar muncul dulu
+                              await Future.delayed(Duration(milliseconds: 300));
+                            } else {
+                               Get.back();
+                                 Get.snackbar(
+                                    "Failed",
+                                    "Failed to update bin location",
+                                    backgroundColor: Colors.red,
+                                    colorText: Colors.white,
+                                  ); 
+                              await Future.delayed(Duration(milliseconds: 300));
+                            }
+                          }
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      barrierDismissible: false,
+    );
+  }
+void _showPrintTypeDialog(String itemName, String itemCode, String lokasiBin) {
+  Get.defaultDialog(
+    title: "QR Type",
+    middleText: "",
+    radius: 5,
+    actions: [
+      ElevatedButton.icon(
+        icon: const Icon(Icons.qr_code),
+        label: const Text("QR Item"),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.green,
+          foregroundColor: Colors.white,
+        ),
+        onPressed: () {
+          Get.back(); // tutup dialog
+          _showPrintDialog(itemName, itemCode); // QR Item normal
+        },
+      ),
+      ElevatedButton.icon(
+        icon: const Icon(Icons.location_on),
+        label: const Text("QR Bin"),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.orange,
+          foregroundColor: Colors.white,
+        ),
+        onPressed: () {
+          if (lokasiBin.trim().isEmpty) {
+            Get.snackbar(
+              "Invalid",
+              "Bin Location is not valid area",
+              backgroundColor: Colors.red,
+              colorText: Colors.white,
+            );
+            return;
+          }
+          Get.back(); // tutup dialog
+          _showPrintDialog(lokasiBin, lokasiBin); // QR Bin
+        },
+      ),
+    ],
+  );
+}
+
   void _showPrintDialog(String itemName, String itemCode) {
     final qtyController = TextEditingController();
     final formKey = GlobalKey<FormState>();
-    final previewHtml = Rx<String?>(null);
+    // final previewHtml = Rx<String?>(null);
+    final previewHtml = Rx<Uint8List?>(null);
+    final previewImage = Rx<Uint8List?>(null);
     final isLoading = false.obs;
 
     Get.dialog(
@@ -376,7 +734,7 @@ class ItemPage extends StatelessWidget {
                     child: Column(
                       children: [
                         Text(
-                          "Item: $itemName",
+                          itemName == itemCode ? "Bin: $itemName" : "Item: $itemName",
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
@@ -387,7 +745,7 @@ class ItemPage extends StatelessWidget {
                           controller: qtyController,
                           keyboardType: TextInputType.number,
                           decoration: InputDecoration(
-                            labelText: "Jumlah Cetakan",
+                            labelText: "Total Print Out",
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
                             ),
@@ -395,11 +753,56 @@ class ItemPage extends StatelessWidget {
                           validator: (value) {
                             final intValue = int.tryParse(value ?? "");
                             if (intValue == null || intValue <= 0) {
-                              return "Masukkan angka lebih dari 0";
+                              return "please fill qty";
                             }
                             return null;
                           },
                         ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: printerController.widthController,
+                                keyboardType: TextInputType.number,
+                                decoration: InputDecoration(
+                                  labelText: "Width (cm)",
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                validator: (value) {
+                                  final val = double.tryParse(value ?? "");
+                                  if (val == null || val <= 0) {
+                                    return "Fill the width";
+                                  }
+                                  return null;
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: TextFormField(
+                                controller: printerController.heightController,
+                                keyboardType: TextInputType.number,
+                                decoration: InputDecoration(
+                                  labelText: "Height (cm)",
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                validator: (value) {
+                                  final val = double.tryParse(value ?? "");
+                                  if (val == null || val <= 0) {
+                                    return "Fill the height";
+                                  }
+                                  return null;
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+
                         const SizedBox(height: 12),
                         ElevatedButton.icon(
                           icon: const Icon(Icons.visibility),
@@ -416,30 +819,28 @@ class ItemPage extends StatelessWidget {
                             if (!formKey.currentState!.validate()) return;
                             final qty = int.tryParse(qtyController.text) ?? 1;
 
+                            // Simpan ke GetStorage
+
                             isLoading.value = true;
 
                             final htmlResult = await printerController
-                                .getBarcodeHtmlFromServer(
+                                .getBarcodeImageFromServer(
                                   itemCode: itemCode,
                                   itemName: itemName,
                                   qty: qty,
+                                  cmWidth: double.parse(
+                                    printerController.widthController.text,
+                                  ),
+                                  cmHeight: double.parse(
+                                    printerController.heightController.text,
+                                  ),
                                 );
 
                             if (htmlResult != null) {
                               previewHtml.value = htmlResult;
-                              if (kIsWeb) {
-                                  ui.platformViewRegistry.registerViewFactory(
-                                    'qr-preview-html',
-                                    (int viewId) {
-                                      final iframe = html.IFrameElement()
-                                        ..width = '100%'
-                                        ..height = '100%'
-                                        ..srcdoc = previewHtml.value!
-                                        ..style.border = 'none';
-                                      return iframe;
-                                    },
-                                  );
-                                }
+                              // if (kIsWeb) {
+                              //      buildWebIframe(previewHtml.value!);
+                              //   }
                             } else {
                               Get.snackbar(
                                 "Error",
@@ -455,33 +856,24 @@ class ItemPage extends StatelessWidget {
                         const SizedBox(height: 12),
                         if (isLoading.value)
                           // const Center(child: CircularProgressIndicator())
-                            const Loading()
+                          const Loading()
                         else if (previewHtml.value != null)
                           Container(
-                            
                             height: 400,
                             margin: const EdgeInsets.only(top: 10),
                             decoration: BoxDecoration(
                               border: Border.all(color: Colors.grey.shade400),
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: ClipRRect( 
+                            child: ClipRRect(
                               borderRadius: BorderRadius.circular(8),
-                              child:
-                                  kIsWeb
-                                      ? HtmlElementView(
-                                        viewType: 'qr-preview-html',
-                                      ) // buat iframe untuk web
-                                      : WebViewWidget(
-                                        controller:
-                                            WebViewController()
-                                              ..setJavaScriptMode(
-                                                JavaScriptMode.unrestricted,
-                                              )
-                                              ..loadHtmlString(
-                                                previewHtml.value!,
-                                              ),
-                                      ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.memory(
+                                  previewHtml.value!,
+                                  fit: BoxFit.contain,
+                                ),
+                              ), 
                             ),
                           ),
                       ],
@@ -501,7 +893,7 @@ class ItemPage extends StatelessWidget {
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.all(14),
                           ),
-                          child: const Text("Tutup"),
+                          child: const Text("Close"),
                         ),
                       ),
                       const SizedBox(width: 10),
@@ -511,17 +903,23 @@ class ItemPage extends StatelessWidget {
                             if (previewHtml.value == null) {
                               Get.snackbar(
                                 "Warning",
-                                "Klik Preview dulu.",
+                                "Pleas click preview first.",
                                 backgroundColor: Colors.orange,
                                 colorText: Colors.white,
                               );
                               return;
                             }
-                          if (kIsWeb) { 
-                            await printerController.webViewController?.runJavaScript("window.print();");
-                          } else if (Platform.isAndroid) {
-                            await printerController.printHtml(previewHtml.value.toString()); 
-                          }
+                            if (kIsWeb) {
+                              printQRController.printImageWeb(
+                                previewHtml.value!,
+                              );
+                            } else if (Platform.isAndroid) {
+                              //await printerController.printHtml(previewHtml.value.toString());
+                              printerController.printQR(previewHtml.value!);
+                            }
+
+                            // printImage(previewHtml.value!);
+
                             Get.back();
                           },
                           icon: const Icon(Icons.print),
@@ -544,7 +942,4 @@ class ItemPage extends StatelessWidget {
       barrierDismissible: false,
     );
   }
-
-
-  
 }

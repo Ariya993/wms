@@ -83,4 +83,5 @@ class DefaultFirebaseOptions {
     authDomain: 'wms-apps-92931.firebaseapp.com',
     storageBucket: 'wms-apps-92931.firebasestorage.app',
   );
+
 }

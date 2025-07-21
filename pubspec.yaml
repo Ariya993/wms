@@ -37,14 +37,21 @@ dependencies:
   webview_flutter: ^4.2.2
   webview_flutter_android: ^3.10.2
   html_to_image: ^2.0.0
+  niimbot_label_printer: ^0.0.2
+  permission_handler: ^11.0.1
+  printing: ^5.14.2
+  pdf: ^3.11.3
+  device_info_plus: ^11.5.0
+  network_info_plus: ^6.1.4
+  encrypt: ^5.0.3
   # qr_code_scanner: ^1.0.1
  
 flutter_icons:
   android: true
   ios: true
-  image_path: "assets/icon.png"
-  adaptive_icon_background: "#FFFFFF" # Putih
-  # adaptive_icon_foreground: "assets/icon.png"
+  image_path: "assets/new_icon.png"
+  adaptive_icon_background: "#389CED" # Putih
+  adaptive_icon_foreground: "assets/new_icon.png"
 
 # flutter_native_splash:
 #   color: "#FFFFFF" # atau warna lain sesuai background app kamu
@@ -67,5 +74,6 @@ flutter:
     - assets/icon.png
     - assets/splash.png
     - assets/smp.png
+    - assets/new_icon.png
 
    

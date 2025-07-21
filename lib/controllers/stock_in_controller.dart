@@ -13,7 +13,7 @@ class StockInController extends GetxController {
 
   var currentMode = StockInMode.poBased.obs;
   var isLoading = false.obs;
-  var isNonPoExpanded = true.obs;
+  var isNonPoExpanded = false.obs;
 
   // --- PO Based Goods Receipt ---
   final TextEditingController poNumberController = TextEditingController();
@@ -426,7 +426,7 @@ class StockInController extends GetxController {
   }
 
   Future<List<Map<String, dynamic>>> getItem(String keyword) async {
-    final result = await _apiService.getItem(keyword);
+    final result = await _apiService.getItemHeader(keyword);
     if (result != null && result is List) {
       return List<Map<String, dynamic>>.from(result);
     } else {

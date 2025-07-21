@@ -150,7 +150,7 @@ class _StockInPageState extends State<StockInPage>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("Stock In", style: TextStyle(color: Colors.white)),
+        title: Text("Inventory In", style: TextStyle(color: Colors.white)),
         backgroundColor: Colors.blue.shade700,
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [
@@ -250,7 +250,7 @@ class _StockInPageState extends State<StockInPage>
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
-              color:Colors.white,
+              color: Colors.white,
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
@@ -269,8 +269,8 @@ class _StockInPageState extends State<StockInPage>
                         Expanded(
                           child: TextField(
                             controller: controller.poNumberController,
-                            decoration: InputDecoration( 
-                              hintText: "PO Number", 
+                            decoration: InputDecoration(
+                              hintText: "PO Number",
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
                               ),
@@ -314,14 +314,32 @@ class _StockInPageState extends State<StockInPage>
             Obx(() {
               if (controller.purchaseOrder.value == null) {
                 return const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(20),
-                    child: Text(
-                      "Please search the PO number.",
-                      style: TextStyle(fontSize: 16, color: Colors.grey),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.business_center,
+                          color: Colors.grey,
+                          size: 60,
+                        ),
+                        SizedBox(height: 10),
+                        Text(
+                          'Please search the PO number',
+                          style: TextStyle(color: Colors.grey, fontSize: 16),
+                        ),
+                      ],
                     ),
-                  ),
-                );
+                  );
+
+                // return const Center(
+                //   child: Padding(
+                //     padding: EdgeInsets.all(20),
+                //     child: Text(
+                //       "Please search the PO number.",
+                //       style: TextStyle(fontSize: 16, color: Colors.grey),
+                //     ),
+                //   ),
+                // );
               }
 
               final po = controller.purchaseOrder.value!;
@@ -331,36 +349,38 @@ class _StockInPageState extends State<StockInPage>
                 children: [
                   // === PO Info ===
                   SizedBox(
-  width: double.infinity,
-  child: Card(
-    elevation: 2,
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(12),
-    ),
-    color: Colors.white,
-    child: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            "PO Details",
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text("PO Number: ${po["docNum"]}"),
-          Text("Vendor: ${po["cardName"]} (${po["cardCode"]})"),
-          Text(
-            "Date: ${DateTime.parse(po["docDate"]).toLocal().toString().split(' ')[0]}",
-          ),
-        ],
-      ),
-    ),
-  ),
-),
+                    width: double.infinity,
+                    child: Card(
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      color: Colors.white,
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              "PO Details",
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text("PO Number: ${po["docNum"]}"),
+                            Text(
+                              "Vendor: ${po["cardName"]} (${po["cardCode"]})",
+                            ),
+                            Text(
+                              "Date: ${DateTime.parse(po["docDate"]).toLocal().toString().split(' ')[0]}",
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
 
                   const SizedBox(height: 16),
 
@@ -671,12 +691,30 @@ class _StockInPageState extends State<StockInPage>
           Flexible(
             child: Obx(() {
               if (controller.nonPoItems.isEmpty) {
-                return const Center(
-                  child: Text(
-                    "No items added.",
-                    style: TextStyle(color: Colors.grey, fontSize: 16),
-                  ),
-                );
+                  return const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.business_center,
+                          color: Colors.grey,
+                          size: 60,
+                        ),
+                        SizedBox(height: 10),
+                        Text(
+                          'No items added',
+                          style: TextStyle(color: Colors.grey, fontSize: 16),
+                        ),
+                      ],
+                    ),
+                  );
+
+                // return const Center(
+                //   child: Text(
+                //     "No items added.",
+                //     style: TextStyle(color: Colors.grey, fontSize: 16),
+                //   ),
+                // );
               }
               return ListView.builder(
                 shrinkWrap: true,

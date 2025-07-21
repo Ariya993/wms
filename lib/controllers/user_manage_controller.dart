@@ -8,6 +8,8 @@ class UserManageController extends GetxController {
   final TextEditingController usernameController = TextEditingController();
   final TextEditingController nameController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
+final TextEditingController emailController = TextEditingController();
+final TextEditingController phoneController = TextEditingController();
 
   Rx<Map<String, dynamic>?> selectedWarehouse = Rx<Map<String, dynamic>?>(null);
   Rx<Map<String, dynamic>?> selectedSuperior = Rx<Map<String, dynamic>?>(null);
@@ -31,7 +33,7 @@ class UserManageController extends GetxController {
       warehouses.assignAll(fetchedWarehouses);
       wmsUsers.assignAll(fetchedWMSUsers);
     } catch (e) {
-      Get.snackbar("Error", "Failed to load dropdown: $e",snackPosition: SnackPosition.TOP,snackStyle: SnackStyle.FLOATING,backgroundColor: Colors.redAccent, colorText: Colors.white);
+      Get.snackbar("Error", "Failed to load dropdown: $e",snackPosition: SnackPosition.TOP,snackStyle: SnackStyle.FLOATING,backgroundColor: Colors.red, colorText: Colors.white);
     } finally {
       isLoading.value = false;
     }
@@ -45,6 +47,8 @@ class UserManageController extends GetxController {
           'username': usernameController.text,
           'nama': nameController.text,
           'password': passwordController.text,
+           'email': emailController.text,
+            'phone': phoneController.text,
           'warehouse_code': selectedWarehouse.value?['warehouseCode'], // SESUAIKAN DENGAN KEY JSON ANDA
           'id_atasan': selectedSuperior.value?['id'], // SESUAIKAN DENGAN KEY JSON ANDA
         };
@@ -54,7 +58,7 @@ class UserManageController extends GetxController {
           _clearForm();
         }
       } catch (e) {
-        Get.snackbar("Error", "Falied to create user: $e",snackPosition: SnackPosition.TOP,snackStyle: SnackStyle.FLOATING,backgroundColor: Colors.redAccent, colorText: Colors.white);
+        Get.snackbar("Error", "Falied to create user: $e",snackPosition: SnackPosition.TOP,snackStyle: SnackStyle.FLOATING,backgroundColor: Colors.red, colorText: Colors.white);
       } finally {
         isLoading.value = false;
       }
@@ -69,6 +73,8 @@ Future<void> updateUser(int id) async {
           'username': usernameController.text,
           'nama': nameController.text,
           'password': passwordController.text,
+           'email': emailController.text,
+            'phone': phoneController.text,
           'warehouse_code': selectedWarehouse.value?['warehouseCode'], // SESUAIKAN DENGAN KEY JSON ANDA
           'id_atasan': selectedSuperior.value?['id'], // SESUAIKAN DENGAN KEY JSON ANDA
         };
@@ -78,7 +84,7 @@ Future<void> updateUser(int id) async {
           _clearForm();
         }
       } catch (e) {
-        Get.snackbar("Error", "Failed to update user: $e",snackPosition: SnackPosition.TOP,snackStyle: SnackStyle.FLOATING,backgroundColor: Colors.redAccent, colorText: Colors.white);
+        Get.snackbar("Error", "Failed to update user: $e",snackPosition: SnackPosition.TOP,snackStyle: SnackStyle.FLOATING,backgroundColor: Colors.red, colorText: Colors.white);
       } finally {
         isLoading.value = false;
       }
@@ -100,7 +106,7 @@ Future<void> updateUser(int id) async {
         nameController.text.isEmpty || 
         selectedWarehouse.value == null ||
         selectedSuperior.value == null) {
-      Get.snackbar("Warning", "All field must be filled!",snackPosition: SnackPosition.TOP,snackStyle: SnackStyle.FLOATING,backgroundColor: Colors.redAccent, colorText: Colors.white);
+      Get.snackbar("Warning", "All field must be filled!",snackPosition: SnackPosition.TOP,snackStyle: SnackStyle.FLOATING,backgroundColor: Colors.orange, colorText: Colors.white);
       return false;
     }
     return true;
@@ -109,6 +115,8 @@ Future<void> updateUser(int id) async {
     usernameController.clear();
     nameController.clear();
     passwordController.clear();
+    emailController.clear();
+    phoneController.clear();
     selectedWarehouse.value = null;
     selectedSuperior.value = null;
   }
@@ -118,6 +126,8 @@ Future<void> updateUser(int id) async {
     usernameController.dispose();
     nameController.dispose();
     passwordController.dispose();
+     emailController.dispose();
+    phoneController.dispose();
     super.onClose();
   }
 }

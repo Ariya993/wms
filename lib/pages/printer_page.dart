@@ -3,14 +3,16 @@ import 'package:get/get.dart';
 import '../controllers/printer_controller.dart';
 
 class SelectPrinterPage extends StatelessWidget {
-  final PrinterController printerController = Get.find<PrinterController>();
+  final PrinterController printerController = Get.put(PrinterController());
 
   SelectPrinterPage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // Panggil initPrinter agar mendeteksi device
-    printerController.initPrinter();
+    // Panggil scanPrinter hanya sekali saat halaman dibuka
+    Future.delayed(Duration.zero, () {
+      printerController.scanPrinter();
+    });
 
     return Scaffold(
       appBar: AppBar(title: const Text('Select Bluetooth Printer')),
@@ -27,18 +29,16 @@ class SelectPrinterPage extends StatelessWidget {
           itemBuilder: (context, index) {
             final device = devices[index];
             final isSelected =
-                printerController.selectedDevice.value?.address ==
-                device.address;
+                printerController.selectedDevice.value?.address == device.address;
 
             return ListTile(
               title: Text(device.name ?? 'Unknown'),
               subtitle: Text(device.address ?? 'No address'),
-              trailing:
-                  isSelected
-                      ? const Icon(Icons.check_circle, color: Colors.green)
-                      : null,
+              trailing: isSelected
+                  ? const Icon(Icons.check_circle, color: Colors.green)
+                  : null,
               onTap: () async {
-                await printerController.connect(device);
+                await printerController.connectPrinter(device); // ✅ konek printer
               },
             );
           },
@@ -65,7 +65,9 @@ class SelectPrinterPage extends StatelessWidget {
                 ),
               if (isConnected)
                 ElevatedButton.icon(
-                  onPressed: () => printerController.disconnect(),
+                  onPressed: () async {
+                    await printerController.disconnectPrinter(); // ✅ disconnect
+                  },
                   icon: const Icon(Icons.cancel),
                   label: const Text('Disconnect'),
                   style: ElevatedButton.styleFrom(backgroundColor: Colors.red),

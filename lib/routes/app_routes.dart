@@ -1,15 +1,21 @@
 import 'package:get/get.dart';
 import 'package:wms/controllers/home_controller.dart';
 import 'package:wms/helper/list_user_binding.dart';
+import 'package:wms/pages/pick_pack_page.dart';
+import '../helper/pick_pack_binding.dart';
+import '../helper/picklist_binding.dart';
 import '../helper/stock_in_binding.dart';
+import '../helper/warehouse_auth_binding.dart';
 import '../pages/login_page.dart';
 import '../pages/home_page.dart'; 
 import '../pages/item_page.dart'; 
+import '../pages/picklist_page.dart';
 import '../pages/printer_page.dart'; 
 import '../helper/printer_binding.dart';
 import '../helper/item_binding.dart';
 import '../pages/stock_in_page.dart';
 import '../pages/list_user_page.dart';
+import '../pages/warehouse_auth_page.dart';
 class AppRoutes { 
 
   static final routes = [
@@ -40,6 +46,21 @@ class AppRoutes {
         name: '/user-manage',
         page: () => ListUserPage(),
         binding: ListUserBinding(),  
+      ),
+       GetPage(
+        name: '/pickpack',
+        page: () => PickPackManagerPage(),
+        binding: PickPackBinding(),  
+      ),
+      GetPage(
+        name: '/picklist',
+        page: () => PicklistsPage(),
+        binding: PickListBinding(),  
+      ),
+       GetPage(
+        name: '/warehouse-auth',
+        page: () => WarehouseAuthPage(),
+        binding: WarehouseAuthBinding(),  
       ),
   ];
 }
