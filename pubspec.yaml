@@ -34,22 +34,24 @@ dependencies:
   image: ^4.3.0
   mobile_scanner: ^3.5.3
   dropdown_search: ^5.0.6
+  webview_flutter: ^4.2.2
+  webview_flutter_android: ^3.10.2
+  html_to_image: ^2.0.0
   # qr_code_scanner: ^1.0.1
  
-# flutter_icons:
-#   android: true
-#   ios: true
-#   image_path: "assets/icon.png"
-#   adaptive_icon_background: "#FFFFFF" # Putih
-#   adaptive_icon_foreground: "assets/icon.png"
+flutter_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon.png"
+  adaptive_icon_background: "#FFFFFF" # Putih
+  # adaptive_icon_foreground: "assets/icon.png"
 
 # flutter_native_splash:
+#   color: "#FFFFFF" # atau warna lain sesuai background app kamu
 #   android: true
-#   ios: true
-#   color: "#FFFFFF"
-#   image: assets/splash.png
-#   android_gravity: center
-#   ios_content_mode: center
+#   ios: false
+#   fullscreen: true 
+#   # image: assets/smp.png 
 
 dev_dependencies:
   flutter_test:
@@ -64,5 +66,6 @@ flutter:
     - assets/bg.png
     - assets/icon.png
     - assets/splash.png
+    - assets/smp.png
 
    

@@ -346,10 +346,10 @@ packages:
     dependency: "direct main"
     description:
       name: flutter_native_splash
-      sha256: "7062602e0dbd29141fb8eb19220b5871ca650be5197ab9c1f193a28b17537bc7"
+      sha256: "8321a6d11a8d13977fa780c89de8d257cce3d841eecfb7a4cadffcc4f12d82dc"
       url: "https://pub.dev"
     source: hosted
-    version: "2.4.4"
+    version: "2.4.6"
   flutter_plugin_android_lifecycle:
     dependency: transitive
     description:
@@ -408,6 +408,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.15.6"
+  html_to_image:
+    dependency: "direct main"
+    description:
+      name: html_to_image
+      sha256: beff5673875c3c5c551378f19be6841953333e0756b350ed36f3b37d26fe86ed
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.0.0"
   http:
     dependency: "direct main"
     description:
@@ -861,6 +869,38 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.1.1"
+  webview_flutter:
+    dependency: "direct main"
+    description:
+      name: webview_flutter
+      sha256: ec81f57aa1611f8ebecf1d2259da4ef052281cb5ad624131c93546c79ccc7736
+      url: "https://pub.dev"
+    source: hosted
+    version: "4.9.0"
+  webview_flutter_android:
+    dependency: "direct main"
+    description:
+      name: webview_flutter_android
+      sha256: "47a8da40d02befda5b151a26dba71f47df471cddd91dfdb7802d0a87c5442558"
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.16.9"
+  webview_flutter_platform_interface:
+    dependency: transitive
+    description:
+      name: webview_flutter_platform_interface
+      sha256: f0dc2dc3a2b1e3a6abdd6801b9355ebfeb3b8f6cde6b9dc7c9235909c4a1f147
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.13.1"
+  webview_flutter_wkwebview:
+    dependency: transitive
+    description:
+      name: webview_flutter_wkwebview
+      sha256: a3d461fe3467014e05f3ac4962e5fdde2a4bf44c561cb53e9ae5c586600fdbc3
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.22.0"
   xdg_directories:
     dependency: transitive
     description:

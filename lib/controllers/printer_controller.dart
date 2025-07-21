@@ -1,17 +1,22 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data'; 
 import 'package:blue_thermal_printer/blue_thermal_printer.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
+import 'package:html_to_image/html_to_image.dart';
 import 'package:http/http.dart' as http;
 import 'package:image/image.dart' as img;
+import 'package:webview_flutter/webview_flutter.dart';
 import 'package:wms/helper/endpoint.dart'; 
-
+import 'dart:html' as html;
 class PrinterController extends GetxController {
   final bluetooth = BlueThermalPrinter.instance;
   final devices = <BluetoothDevice>[].obs;
   final selectedDevice = Rx<BluetoothDevice?>(null);
+   WebViewController? webViewController;
   final isConnected = false.obs;
 
   final box = GetStorage();
@@ -76,6 +81,60 @@ class PrinterController extends GetxController {
       })
       .catchError((e, stacktrace) { 
         Get.snackbar("Error", "Exception barcode:\n$e",snackPosition: SnackPosition.TOP,snackStyle: SnackStyle.FLOATING,backgroundColor: Colors.redAccent, colorText: Colors.white);
+        return null;
+      });
+}
+
+Future<String?> getBarcodeHtmlFromServer({
+  required String itemCode,
+  required String itemName,
+  required int qty,
+  double cmWidth = 5,
+  double cmHeight = 3,
+}) {
+  final token = box.read('token');
+
+  final url =
+      "$apiBarcodeWMS/QRHtml?qty=$qty&cm_width=$cmWidth&cm_height=$cmHeight";
+
+  final body = {
+    "ItemCode": itemCode,
+    "ItemName": itemName,
+  };
+
+  return http
+      .post(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode(body),
+      )
+      .then((response) {
+        if (response.statusCode == 200) {
+          return response.body; // HTML string
+        } else {
+          Get.snackbar(
+            "Error",
+            "Failed get HTML barcode: ${response.statusCode}",
+            snackPosition: SnackPosition.TOP,
+            snackStyle: SnackStyle.FLOATING,
+            backgroundColor: Colors.redAccent,
+            colorText: Colors.white,
+          );
+          return null;
+        }
+      })
+      .catchError((e) {
+        Get.snackbar(
+          "Error",
+          "Exception barcode:\n$e",
+          snackPosition: SnackPosition.TOP,
+          snackStyle: SnackStyle.FLOATING,
+          backgroundColor: Colors.redAccent,
+          colorText: Colors.white,
+        );
         return null;
       });
 }
@@ -173,34 +232,51 @@ Future<void> printBarcodeFromServer({
   void clearSavedPrinter() {
     box.remove(_selectedPrinterKey);
     selectedDevice.value = null;
-  }
+  } 
+  
+  Future<void> printHtml(String html) async {
+    final Uint8List imageBytes =  await HtmlToImage.convertToImage(content: html,);
 
-  Future<void> printText(String text) async {
-    if (isConnected.value) {
-      try {
-        await bluetooth.printNewLine();
-        await bluetooth.printCustom(text, 1, 1);
-        await bluetooth.printNewLine();
-        await bluetooth.paperCut();
-      } catch (e) {
-        Get.snackbar("Printer", "Failed to print text: $e",snackPosition: SnackPosition.TOP,snackStyle: SnackStyle.FLOATING,backgroundColor: Colors.redAccent, colorText: Colors.white);
-      }
-    } else {
-      Get.snackbar("Printer", "Not connected",snackPosition: SnackPosition.TOP,snackStyle: SnackStyle.FLOATING,backgroundColor: Colors.redAccent, colorText: Colors.white);
-    }
-  }
+    // Konversi PNG ke format bitmap printer
+    final img.Image? image = img.decodeImage(imageBytes);
+    if (image == null) throw Exception("Gagal decode image");
 
-  Future<void> printQRCode(String data) async {
-    if (isConnected.value) {
-      try {
-        await bluetooth.printQRcode(data, 200, 200, 1);
-        await bluetooth.printNewLine();
-        await bluetooth.paperCut();
-      } catch (e) {
-        Get.snackbar("Printer", "Failed to print QR Code: $e",snackPosition: SnackPosition.TOP,snackStyle: SnackStyle.FLOATING,backgroundColor: Colors.redAccent, colorText: Colors.white);
-      }
-    } else {
-      Get.snackbar("Printer", "Not connected",snackPosition: SnackPosition.TOP,snackStyle: SnackStyle.FLOATING,backgroundColor: Colors.redAccent, colorText: Colors.white);
-    }
-  }
+    await bluetooth.printNewLine();
+    await bluetooth.printImageBytes(img.encodeJpg(image)); // atau encodeBmp(image)
+    await bluetooth.printNewLine();
+    await bluetooth.paperCut(); 
+
+
+  // if (kIsWeb) {
+  //   // Web: Open new tab and trigger browser print
+  //   // final newWindow = html.replaceAll('"', '\\"'); // Escape double quotes
+  //   // final js = '''
+  //   //   var printWindow = window.open('', '_blank');
+  //   //   printWindow.document.open();
+  //   //   printWindow.document.write("$newWindow");
+  //   //   printWindow.document.close();
+  //   //   printWindow.print();
+  //   // '''; 
+  // final newWindow = html.open('', '_blank');
+  // newWindow.document.write(html);
+  // newWindow.document.close();
+  // newWindow.print();
+
+  // } else if (Platform.isAndroid) {
+  //   final Uint8List imageBytes =  await HtmlToImage.convertToImage(content: html,);
+
+  //   // Konversi PNG ke format bitmap printer
+  //   final img.Image? image = img.decodeImage(imageBytes);
+  //   if (image == null) throw Exception("Gagal decode image");
+
+  //   await bluetooth.printNewLine();
+  //   await bluetooth.printImageBytes(img.encodeJpg(image)); // atau encodeBmp(image)
+  //   await bluetooth.printNewLine();
+  //   await bluetooth.paperCut(); 
+  // }  
+}
+
+ 
+
+
 }

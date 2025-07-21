@@ -1,14 +1,10 @@
-import 'dart:io';
 import 'dart:typed_data';
-import 'dart:ui_web' as ui;
-import 'dart:html' as html;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
-import 'package:webview_flutter/webview_flutter.dart';
+import 'package:get/get.dart'; 
 import '../controllers/item_controller.dart';
 import '../controllers/printer_controller.dart';
-import '../widgets/loading.dart';
 
 class ItemPage extends StatelessWidget {
   final ItemController itemController = Get.put(ItemController());
@@ -116,7 +112,8 @@ class ItemPage extends StatelessWidget {
                   if (width > 1800) {
                     crossAxisCount = 6;
                     childAspectRatio = 1.0;
-                  } else if (width > 1200) {
+                  }
+                  else if (width > 1200) {
                     crossAxisCount = 4;
                     childAspectRatio = 1.0;
                   } else if (width > 800) {
@@ -147,10 +144,8 @@ class ItemPage extends StatelessWidget {
                         final item = itemController.items[index];
                         final String itemCode = item['ItemCode'] ?? '';
                         final String itemName = item['ItemName'] ?? '';
-                        final int stockOnHand =
-                            (item['QuantityOnStock'] ?? 0.0).toInt();
-                        final int stockCommitted =
-                            (item['QuantityOrderedByCustomers'] ?? 0.0).toInt();
+                        final int stockOnHand = (item['QuantityOnStock'] ?? 0.0).toInt();
+                        final int stockCommitted = (item['QuantityOrderedByCustomers'] ?? 0.0).toInt();
 
                         return Card(
                           shape: RoundedRectangleBorder(
@@ -338,213 +333,254 @@ class ItemPage extends StatelessWidget {
   }
 
   void _showPrintDialog(String itemName, String itemCode) {
-    final qtyController = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-    final previewHtml = Rx<String?>(null);
-    final isLoading = false.obs;
+  final qtyController = TextEditingController();
+  final formKey = GlobalKey<FormState>();
+  final previewImage = Rx<Uint8List?>(null);
+  final previewHtml = Rx<String?>(null);
+  final isLoading = false.obs;
 
-    Get.dialog(
-      Dialog(
-        insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: Obx(
-          () => SingleChildScrollView(
+  Get.dialog(
+    Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
             padding: EdgeInsets.only(
-              bottom: MediaQuery.of(Get.context!).viewInsets.bottom,
+              bottom: MediaQuery.of(context).viewInsets.bottom,
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Padding(
-                  padding: EdgeInsets.only(top: 16),
-                  child: Center(
-                    child: Text(
-                      "Preview & Print QR",
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey,
-                      ),
-                    ),
-                  ),
-                ),
-                const Divider(),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Form(
-                    key: formKey,
-                    child: Column(
-                      children: [
-                        Text(
-                          "Item: $itemName",
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: qtyController,
-                          keyboardType: TextInputType.number,
-                          decoration: InputDecoration(
-                            labelText: "Jumlah Cetakan",
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          validator: (value) {
-                            final intValue = int.tryParse(value ?? "");
-                            if (intValue == null || intValue <= 0) {
-                              return "Masukkan angka lebih dari 0";
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 12),
-                        ElevatedButton.icon(
-                          icon: const Icon(Icons.visibility),
-                          label: const Text("Preview"),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.orange,
-                            foregroundColor: Colors.white,
-                            minimumSize: const Size(double.infinity, 45),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          onPressed: () async {
-                            if (!formKey.currentState!.validate()) return;
-                            final qty = int.tryParse(qtyController.text) ?? 1;
-
-                            isLoading.value = true;
-
-                            final htmlResult = await printerController
-                                .getBarcodeHtmlFromServer(
-                                  itemCode: itemCode,
-                                  itemName: itemName,
-                                  qty: qty,
-                                );
-
-                            if (htmlResult != null) {
-                              previewHtml.value = htmlResult;
-                              if (kIsWeb) {
-                                  ui.platformViewRegistry.registerViewFactory(
-                                    'qr-preview-html',
-                                    (int viewId) {
-                                      final iframe = html.IFrameElement()
-                                        ..width = '100%'
-                                        ..height = '100%'
-                                        ..srcdoc = previewHtml.value!
-                                        ..style.border = 'none';
-                                      return iframe;
-                                    },
-                                  );
-                                }
-                            } else {
-                              Get.snackbar(
-                                "Error",
-                                "Failed to generate preview",
-                                backgroundColor: Colors.red,
-                                colorText: Colors.white,
-                              );
-                            }
-
-                            isLoading.value = false;
-                          },
-                        ),
-                        const SizedBox(height: 12),
-                        if (isLoading.value)
-                          // const Center(child: CircularProgressIndicator())
-                            const Loading()
-                        else if (previewHtml.value != null)
-                          Container(
-                            
-                            height: 400,
-                            margin: const EdgeInsets.only(top: 10),
-                            decoration: BoxDecoration(
-                              border: Border.all(color: Colors.grey.shade400),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: ClipRRect( 
-                              borderRadius: BorderRadius.circular(8),
-                              child:
-                                  kIsWeb
-                                      ? HtmlElementView(
-                                        viewType: 'qr-preview-html',
-                                      ) // buat iframe untuk web
-                                      : WebViewWidget(
-                                        controller:
-                                            WebViewController()
-                                              ..setJavaScriptMode(
-                                                JavaScriptMode.unrestricted,
-                                              )
-                                              ..loadHtmlString(
-                                                previewHtml.value!,
-                                              ),
-                                      ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-                const Divider(),
-                Padding(
-                  padding: const EdgeInsets.all(12.0),
-                  child: Row(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: constraints.maxHeight * 0.8,
+                maxWidth: MediaQuery.of(context).size.width * 0.9,
+              ),
+              child: IntrinsicHeight(
+                child: Obx(
+                  () => Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () => Get.back(),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.all(14),
+                      // Title
+                      const Padding(
+                        padding: EdgeInsets.only(top: 16),
+                        child: Center(
+                          child: Text(
+                            "Preview & Print QR",
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.grey,
+                            ),
                           ),
-                          child: const Text("Tutup"),
                         ),
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: () async {
-                            if (previewHtml.value == null) {
-                              Get.snackbar(
-                                "Warning",
-                                "Klik Preview dulu.",
-                                backgroundColor: Colors.orange,
-                                colorText: Colors.white,
-                              );
-                              return;
-                            }
-                          if (kIsWeb) { 
-                            await printerController.webViewController?.runJavaScript("window.print();");
-                          } else if (Platform.isAndroid) {
-                            await printerController.printHtml(previewHtml.value.toString()); 
-                          }
-                            Get.back();
-                          },
-                          icon: const Icon(Icons.print),
-                          label: const Text("Print"),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.all(14),
+                      const Divider(),
+
+                      // Form
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 12),
+                        child: Form(
+                          key: formKey,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Text(
+                                "Item: $itemName",
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              const Text(
+                                "Masukkan jumlah barcode yang ingin dicetak:",
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 12),
+                              TextFormField(
+                                controller: qtyController,
+                                keyboardType: TextInputType.number,
+                                decoration: InputDecoration(
+                                  labelText: "Jumlah Cetakan",
+                                  hintText: "Contoh: 5",
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                validator: (value) {
+                                  final intValue = int.tryParse(value ?? "");
+                                  if (intValue == null || intValue <= 0) {
+                                    return "Masukkan angka lebih dari 0";
+                                  }
+                                  return null;
+                                },
+                              ),
+                              const SizedBox(height: 10),
+                              ElevatedButton.icon(
+                                icon: const Icon(Icons.visibility),
+                                label: const Text("Preview"),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.orange,
+                                  foregroundColor: Colors.white,
+                                  minimumSize:
+                                      const Size(double.infinity, 45),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                onPressed: () {
+                                  if (!formKey.currentState!.validate())
+                                    return;
+
+                                  final qty =
+                                      int.tryParse(qtyController.text) ?? 1;
+
+                                  isLoading.value = true;
+                                  printerController
+                                      // .getBarcodeImageFromServer(
+                                        .getBarcodeHtmlFromServer(
+                                    itemCode: itemCode,
+                                    itemName: itemName,
+                                    qty: qty,
+                                  )
+                                      .then((result) {
+                                    if (result != null) {
+                                       previewHtml.value = result;
+                                      // previewImage.value = result;
+                                    } else {
+                                      Get.snackbar(
+                                        "Error",
+                                        "Failed to get preview.",
+                                        snackPosition: SnackPosition.TOP,
+                                        backgroundColor: Colors.redAccent,
+                                        colorText: Colors.white,
+                                      );
+                                    }
+                                   
+                                  }).catchError((e) {
+                                    Get.snackbar(
+                                      "Error",
+                                      "Failed to preview: $e",
+                                      snackPosition: SnackPosition.TOP,
+                                      backgroundColor: Colors.redAccent,
+                                      colorText: Colors.white,
+                                    );
+                                  }).whenComplete(() {
+                                    isLoading.value = false;
+                                  });
+                                },
+                              ),
+                              const SizedBox(height: 12),
+                              if (isLoading.value)
+                                const Center(
+                                    child: CircularProgressIndicator())
+                              else if (previewImage.value != null)
+                                Container(
+                                  decoration: BoxDecoration(
+                                    border: Border.all(color: Colors.grey),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Image.memory(
+                                      previewImage.value!,
+                                      fit: BoxFit.contain,
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
+                        ),
+                      ),
+
+                      const Divider(height: 1, thickness: 1),
+
+                      // Footer buttons
+                      Padding(
+                        padding: const EdgeInsets.all(15.0),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: () => Get.back(),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.red,
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical: 12),
+                                ),
+                                child: const Text(
+                                  "Clode",
+                                  style: TextStyle(fontSize: 16),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                icon: const Icon(Icons.print),
+                                label: const Text(
+                                  "Print",
+                                  style: TextStyle(fontSize: 16),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.green,
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical: 12),
+                                ),
+                                onPressed: () async {
+                                  if (previewImage.value == null) {
+                                    Get.snackbar(
+                                      "Warning",
+                                      "Klik 'Preview' first.",
+                                      snackPosition: SnackPosition.TOP,
+                                      backgroundColor: Colors.orangeAccent,
+                                      colorText: Colors.white,
+                                    );
+                                    return;
+                                  }
+
+                                  final selected = printerController
+                                      .selectedDevice.value;
+                                  if (selected == null) {
+                                    Get.snackbar(
+                                      "Printer",
+                                      "Select a printer first.",
+                                      snackPosition: SnackPosition.TOP,
+                                      backgroundColor: Colors.orangeAccent,
+                                      colorText: Colors.white,
+                                    );
+                                    return;
+                                  }
+
+                                  await printerController
+                                      .printImageFromBytes(
+                                          previewImage.value!);
+                                  Get.back();
+                                },
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
                 ),
-              ],
+              ),
             ),
-          ),
-        ),
+          );
+        },
       ),
-      barrierDismissible: false,
-    );
-  }
+    ),
+    barrierDismissible: false,
+  );
+}
 
-
-  
 }

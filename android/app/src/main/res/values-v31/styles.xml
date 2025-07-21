@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="NormalTheme" parent="Theme.AppCompat.Light.NoActionBar">
+    <style name="NormalTheme" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <item name="android:windowBackground">@android:color/white</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@null</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">@android:color/white</item>
+        <item name="android:windowSplashScreenBackground">@android:color/white</item>
+        <!-- <item name="android:postSplashScreenTheme">@style/NormalTheme</item> -->
     </style>
 </resources>

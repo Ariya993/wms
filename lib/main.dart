@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -7,13 +9,15 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'firebase_options.dart';
 import 'routes/app_routes.dart';
-// import 'pages/login_page.dart';
-// import 'pages/home_page.dart';
+import 'pages/login_page.dart';
+import 'pages/home_page.dart';
 import 'package:wms/services/api_service.dart';
 import 'package:wms/services/sap_service.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:webview_flutter/webview_flutter.dart';
+import 'package:webview_flutter_android/webview_flutter_android.dart'; 
 
-import 'splashscreen_page.dart';
+//import 'splashscreen_page.dart';
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
@@ -21,7 +25,13 @@ final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await GetStorage.init();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform); 
+ 
+
+  if (!kIsWeb && Platform.isAndroid) {
+  WebViewPlatform.instance = AndroidWebViewPlatform();
+}
+  
   await initializeDateFormatting('id_ID', null);
 
   Get.put(ApiService(), permanent: true);
@@ -38,22 +48,22 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    //final box = GetStorage();
-    // final token = box.read('token');
-    // final expires = box.read('refreshTokenExpiryTime');
+    final box = GetStorage();
+    final token = box.read('token');
+    final expires = box.read('refreshTokenExpiryTime');
 
-    // if (token != null && expires != null) {
-    //   final expire = DateTime.parse(expires);
-    //   if (!DateTime.now().isBefore(expire.subtract(const Duration(seconds: 10)))) {
-    //     Get.find<ApiService>().refreshToken();
-    //   }
-    // }
+    if (token != null && expires != null) {
+      final expire = DateTime.parse(expires);
+      if (!DateTime.now().isBefore(expire.subtract(const Duration(seconds: 10)))) {
+        Get.find<ApiService>().refreshToken();
+      }
+    }
 
     return GetMaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'WMS App',
-      // home: token != null ? HomePage() : LoginPage(),
-       home: const SplashScreenPage(),
+      home: token != null ? HomePage() : LoginPage(),
+      //  home: const SplashScreenPage(),
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue.shade700),
         useMaterial3: true,

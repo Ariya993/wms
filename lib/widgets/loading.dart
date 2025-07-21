@@ -52,15 +52,15 @@ class _LoadingState extends State<Loading> with SingleTickerProviderStateMixin {
             turns: _controller,
             child: Image.asset(
               'assets/logo.png',
-              width: 60,
-              height: 60,
+              width: 80,
+              height: 80,
             ),
           ),
           const SizedBox(height: 16),
           Text(
             'Loading $dots',
             style: const TextStyle(
-              fontSize: 16,
+              fontSize: 20,
               fontWeight: FontWeight.w700,
               color: Color.fromARGB(255, 25, 118, 210),
                letterSpacing: 0.3,

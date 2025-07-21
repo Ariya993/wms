@@ -46,13 +46,18 @@ class LoginController extends GetxController {
           await box.write('internalkey', result['internalKey']); 
            await _sendFcmTokenToServer(usernameController.text);
           Get.offNamed('/home');
+        } else  if (resp.statusCode == 401) {
+         Get.snackbar("Failed", "Invalid Username and Password",snackPosition: SnackPosition.TOP,snackStyle: SnackStyle.FLOATING,backgroundColor: Colors.redAccent, colorText: Colors.white);
+        } else if (resp.statusCode == 403) {
+          Get.snackbar("Failed", "Forbidden.. Please contact IT administrator",snackPosition: SnackPosition.TOP,snackStyle: SnackStyle.FLOATING,backgroundColor: Colors.redAccent, colorText: Colors.white);
         } else {
           final Map<String, dynamic> errorData = jsonDecode(resp.body);
           Get.snackbar("Failed", errorData['error']['message']['value'],snackPosition: SnackPosition.TOP,snackStyle: SnackStyle.FLOATING,backgroundColor: Colors.redAccent, colorText: Colors.white);
         }
       
     } catch (e) {
-      Get.snackbar("Error", "Gagal login: $e");
+      Get.snackbar("Error", "Gagal login: Koneksi ke server terputus",
+          snackPosition: SnackPosition.TOP,snackStyle: SnackStyle.FLOATING,backgroundColor: Colors.redAccent, colorText: Colors.white);
     } finally {
       isLoading.value = false;
     }
