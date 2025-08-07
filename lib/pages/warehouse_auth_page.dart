@@ -290,6 +290,7 @@ Widget _buildWarehouseCard(
                     ),
                   ),
                 ),
+               const SizedBox(height: 20),
               ],
             ),
           ),

@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:intl/intl.dart';
+import 'package:wms/controllers/item_controller.dart';
+import '../services/api_service.dart';
 import '../services/sap_service.dart';
 import '../widgets/custom_dropdown_search.dart';
 
@@ -10,7 +12,8 @@ enum StockInMode { poBased, nonPo }
 
 class StockInController extends GetxController {
   final SAPService _apiService = Get.find<SAPService>();
-
+  final ApiService _apiServices = Get.find<ApiService>();
+  final ItemController itemcontroller = Get.find<ItemController>();
   var currentMode = StockInMode.poBased.obs;
   var isLoading = false.obs;
   var isNonPoExpanded = false.obs;
@@ -29,11 +32,18 @@ class StockInController extends GetxController {
 
   final RxList<Map<String, dynamic>> vendorList = <Map<String, dynamic>>[].obs;
   final RxString selectedVendor = ''.obs;
+  Rx<Map<String, dynamic>?> selectedWarehouse = Rx<Map<String, dynamic>?>(null);
+  RxList<Map<String, dynamic>> warehouses = <Map<String, dynamic>>[].obs;
+  RxList<Map<String, dynamic>> wmsUsers = <Map<String, dynamic>>[].obs;
+List<TextEditingController> poItemQtyControllers = [];
+
+
   final box = GetStorage();
   @override
   void onInit() {
     super.onInit();
     fetchVendors();
+    fetchDropdownData();
   }
 
   @override
@@ -61,6 +71,28 @@ class StockInController extends GetxController {
     nonPoItemCodeController.clear();
     nonPoItemNameController.clear();
     nonPoQuantityController.clear();
+  }
+
+  Future<void> fetchDropdownData() async {
+    isLoading.value = true;
+    try {
+      final fetchedWarehouses = await _apiServices.getWarehouses();
+      final fetchedWMSUsers = await _apiServices.getWMSUsers();
+
+      warehouses.assignAll(fetchedWarehouses);
+      wmsUsers.assignAll(fetchedWMSUsers);
+    } catch (e) {
+      Get.snackbar(
+        "Error",
+        "Failed to load dropdown: $e",
+        snackPosition: SnackPosition.TOP,
+        snackStyle: SnackStyle.FLOATING,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    } finally {
+      isLoading.value = false;
+    }
   }
 
   Future<void> searchPo() async {
@@ -94,7 +126,7 @@ class StockInController extends GetxController {
           "documentStatus": poData["documentStatus"],
         };
         if (purchaseOrder.value!["documentStatus"] != "O") {
-           purchaseOrder.value = null;
+          purchaseOrder.value = null;
           Get.snackbar(
             'Info',
             'PO ${poData["docNum"]} is not open.',
@@ -137,7 +169,7 @@ class StockInController extends GetxController {
         );
         purchaseOrder.value = null;
       }
-    } 
+    }
     // else {
     //   Get.snackbar(
     //     'Not Found',
@@ -154,18 +186,26 @@ class StockInController extends GetxController {
       final item = poItems[index];
       if (quantity <= (item["RemainingOpenInventoryQuantity"] ?? 0)) {
         item["currentReceivedQuantity"] = quantity;
-      } else {
-        item["currentReceivedQuantity"] =
-            item["RemainingOpenInventoryQuantity"];
+      } else { 
+          final rawOpen = item["RemainingOpenInventoryQuantity"];
+          final openQty = (rawOpen is num) ? rawOpen.toDouble() : 0.0;
+           
+          quantity=openQty+1;
+          item["currentReceivedQuantity"] = quantity;
         Get.snackbar(
           'Warning',
-          'Quantity for ${item["ItemDescription"]} cannot exceed open quantity (${item["RemainingOpenInventoryQuantity"]}).',
+          'Quantity for "${item["ItemDescription"]}" cannot exceed open quantity (${item["RemainingOpenInventoryQuantity"]}).',
           snackPosition: SnackPosition.TOP,
           backgroundColor: Colors.orange.shade700,
           colorText: Colors.white,
         );
+      
       }
-      poItems[index] = item;
+       item["currentReceivedQuantity"] = quantity;
+      poItems[index] = item; 
+     poItems.refresh();
+        // poItems[index]["currentReceivedQuantity"] = quantity;
+    // poItemQtyControllers[index].text = quantity.toStringAsFixed(0);
     }
   }
 
@@ -186,6 +226,7 @@ class StockInController extends GetxController {
       }
       item["currentReceivedQuantity"] = quantity;
       nonPoItems[index] = item;
+      poItems.refresh();
     }
   }
 
@@ -207,16 +248,41 @@ class StockInController extends GetxController {
       );
       return;
     }
-     String warehouse_code = box.read('warehouse_code') ?? '';
-    int bpl_id = box.read('bpl_id') ?? 0;
+    
+
     final result = await showSubmitDialog(context);
     if (result == null) return;
+
+    String warehouse_code =
+        selectedWarehouse.value?["warehouseCode"] ?? box.read('warehouse_code');
+    final warehouse = {'warehouse_code': warehouse_code};
+
+    final data = await _apiServices.getWarehouseAuth(warehouse);
+    int bpl_id = data?['bpl_id'] ?? box.read('bpl_id');
+    final sapDb = data?['sap_db_name'] ?? box.read('sap_db_name');
+    final sapUser = data?['sap_username'] ?? '';
+    final sapPass = data?['sap_password'] ?? '';
+
+    final loginSuccess = await _apiService.LoginSAP(
+      sap_db: sapDb,
+      sap_username: sapUser,
+      sap_pass: sapPass,
+    );
+    if (!loginSuccess) {
+      Get.snackbar(
+        "Session Expired",
+        "Gagal login ulang. Silakan login manual.",
+        snackPosition: SnackPosition.TOP,
+      );
+      box.erase();
+      Get.offAllNamed('/login');
+    }
     final payload = {
       "DocDate": result['DocDate'],
       "CardCode": purchaseOrder.value!["cardCode"],
       "CardName": purchaseOrder.value!["cardName"],
       "NumAtCard": result['NoRef'],
-      "Comments":  result['Comments'] ?? '', 
+      "Comments": result['Comments'] ?? '',
       "BPL_IDAssignedToInvoice": bpl_id,
       "DocumentLines":
           poItems
@@ -225,10 +291,10 @@ class StockInController extends GetxController {
                 (item) => {
                   "ItemCode": item["ItemCode"],
                   "Quantity": item["currentReceivedQuantity"].toInt(),
-                   "WarehouseCode": warehouse_code,
-                   "BaseType": 22,
-					          "BaseEntry": purchaseOrder.value!["docEntry"],
-                    "BaseLine": item["LineNum"],
+                  "WarehouseCode": warehouse_code,
+                  "BaseType": 22,
+                  "BaseEntry": purchaseOrder.value!["docEntry"],
+                  "BaseLine": item["LineNum"],
                 },
               )
               .toList(),
@@ -239,176 +305,203 @@ class StockInController extends GetxController {
     isLoading.value = false;
 
     if (success) {
-      Get.snackbar(
-        'Success',
-        'Data has been successfully submitted.',
-        snackPosition: SnackPosition.TOP,
-        backgroundColor: Colors.green.shade700,
-        colorText: Colors.white,
-      );
+       Get.snackbar(
+      'Success',
+      'Data has been successfully submitted.',
+      snackPosition: SnackPosition.TOP,
+      backgroundColor: Colors.green.shade700,
+      colorText: Colors.white,
+      duration: Duration(seconds: 3),
+    );
+
+    // Delay reset form biar snackbar sempat muncul
+    Future.delayed(Duration(milliseconds: 500), () {
       resetForm();
-    } 
-    // else {
-    //   Get.snackbar(
-    //     'Failed',
-    //     'failed to submit data. Please try again.',
-    //     snackPosition: SnackPosition.TOP,
-    //     backgroundColor: Colors.red.shade700,
-    //     colorText: Colors.white,
-    //   );
-    // }
+    });
+    }
   }
 
   Future<Map<String, dynamic>?> showSubmitDialog(BuildContext context) async {
-  TextEditingController dateController = TextEditingController(
-    text: DateFormat('yyyy-MM-dd').format(DateTime.now()),
-  );
-  TextEditingController remarksController = TextEditingController(); // Controller untuk Remarks
-  TextEditingController norefController = TextEditingController();
-  RxString selectedVendor = ''.obs;
+    TextEditingController dateController = TextEditingController(
+      text: DateFormat('yyyy-MM-dd').format(DateTime.now()),
+    );
+    TextEditingController remarksController =
+        TextEditingController(); // Controller untuk Remarks
+    TextEditingController norefController = TextEditingController();
+    RxString selectedVendor = ''.obs;
 
-  return await Get.dialog<Map<String, dynamic>>(
-    Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      backgroundColor: Colors.white,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.85,
-        ),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.inventory_2_outlined,
-                    size: 28,
-                    color: Colors.blue.shade700,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'Receipt Confirmation',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue.shade800,
+    return await Get.dialog<Map<String, dynamic>>(
+      Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        backgroundColor: Colors.white,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.85,
+          ),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.inventory_2_outlined,
+                      size: 28,
+                      color: Colors.blue.shade700,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Receipt Confirmation',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue.shade800,
+                        ),
                       ),
                     ),
+                  ],
+                ),
+                const Divider(color: Colors.blueGrey),
+                const SizedBox(height: 20),
+                CustomDropdownSearch<Map<String, dynamic>>(
+                  labelText: "Warehouse",
+                  selectedItem: selectedWarehouse.value,
+                  asyncItems: (String? filter) async {
+                    if (filter == null || filter.isEmpty) {
+                      return warehouses.toList();
+                    }
+                    return warehouses
+                        .where(
+                          (wh) =>
+                              (wh['warehouseCode'] as String)
+                                  .toLowerCase()
+                                  .contains(filter.toLowerCase()) ||
+                              (wh['warehouseName'] as String)
+                                  .toLowerCase()
+                                  .contains(filter.toLowerCase()),
+                        )
+                        .toList();
+                  },
+                  onChanged: (warehouse) {
+                    selectedWarehouse.value = warehouse;
+                  },
+                  itemAsString:
+                      (Map<String, dynamic> wh) =>
+                          '${wh['warehouseCode']} - ${wh['warehouseName']}',
+                  compareFn:
+                      (item1, item2) =>
+                          item1['warehouseCode'] == item2['warehouseCode'],
+                ),
+                const SizedBox(height: 16),
+                // Document Date
+                TextField(
+                  controller: dateController,
+                  readOnly: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Receipt Date',
+                    border: OutlineInputBorder(),
                   ),
-                ],
-              ),
-              const Divider(color: Colors.blueGrey),
-              const SizedBox(height: 20),
-
-              // Document Date
-              TextField(
-                controller: dateController,
-                readOnly: true,
-                decoration: const InputDecoration(
-                  labelText: 'Receipt Date', 
-                  border: OutlineInputBorder(),
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: DateTime.now(),
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime(2100),
+                    );
+                    if (picked != null) {
+                      dateController.text = DateFormat(
+                        'yyyy-MM-dd',
+                      ).format(picked);
+                    }
+                  },
                 ),
-                onTap: () async {
-                  final picked = await showDatePicker(
-                    context: context,
-                    initialDate: DateTime.now(),
-                    firstDate: DateTime(2020),
-                    lastDate: DateTime(2100),
-                  );
-                  if (picked != null) {
-                    dateController.text = DateFormat('yyyy-MM-dd').format(picked);
-                  }
-                },
-              ),
 
-              const SizedBox(height: 16),
+                const SizedBox(height: 16),
 
-              // No Reference
-              TextField(
-                controller: norefController,
-                decoration: const InputDecoration(
-                  labelText: 'No Reference', 
-                  border: OutlineInputBorder(),
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              // Remarks
-              TextField(
-                controller: remarksController,
-                decoration: const InputDecoration(
-                  labelText: 'Remarks', 
-                  border: OutlineInputBorder(),
-                ),
-                maxLines: 3,
-                maxLength: 200,
-              ),
-
-              const SizedBox(height: 24),
-              const Divider(color: Colors.blueGrey),
-
-              // Buttons
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    style: TextButton.styleFrom(
-                      foregroundColor: Colors.grey.shade700,
-                    ),
-                    onPressed: () => Get.back(),
-                    child: const Text('Cancel'),
+                // No Reference
+                TextField(
+                  controller: norefController,
+                  decoration: const InputDecoration(
+                    labelText: 'No Reference',
+                    border: OutlineInputBorder(),
                   ),
-                  const SizedBox(width: 12),
-                  ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green.shade600,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 12,
+                ),
+
+                const SizedBox(height: 16),
+
+                // Remarks
+                TextField(
+                  controller: remarksController,
+                  decoration: const InputDecoration(
+                    labelText: 'Remarks',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 3,
+                  maxLength: 200,
+                ),
+
+                const SizedBox(height: 24),
+                const Divider(color: Colors.blueGrey),
+
+                // Buttons
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.grey.shade700,
                       ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
+                      onPressed: () => Get.back(),
+                      child: const Text('Cancel'),
                     ),
-                    onPressed: () {
-                      if (dateController.text.isEmpty) {
-                        Get.snackbar(
-                          'Validation',
-                          'Document Date is required.',
-                          backgroundColor: Colors.red.shade600,
-                          colorText: Colors.white,
+                    const SizedBox(width: 12),
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green.shade600,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      onPressed: () {
+                        if (dateController.text.isEmpty) {
+                          Get.snackbar(
+                            'Validation',
+                            'Document Date is required.',
+                            backgroundColor: Colors.red.shade600,
+                            colorText: Colors.white,
+                          );
+                          return;
+                        }
+
+                        Get.back(
+                          result: {
+                            'DocDate': dateController.text,
+                            'CardCode': selectedVendor,
+                            'NoRef': norefController.text,
+                            'Comments': remarksController.text,
+                          },
                         );
-                        return;
-                      }
-
-                      Get.back(
-                        result: {
-                          'DocDate': dateController.text,
-                          'CardCode': selectedVendor,
-                          'NoRef': norefController.text,
-                          'Comments': remarksController.text,
-                        },
-                      );
-                    },
-                    icon: const Icon(Icons.check_circle_outline),
-                    label: const Text('Submit'),
-                  ),
-                ],
-              ),
-            ],
+                      },
+                      icon: const Icon(Icons.check_circle_outline),
+                      label: const Text('Submit'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
-    ),
-  );
-}
-
+    );
+  }
 
   Future<void> fetchVendors() async {
     final result = await _apiService.getVendors();
@@ -452,10 +545,32 @@ class StockInController extends GetxController {
       );
       return;
     }
-    String warehouse_code = box.read('warehouse_code') ?? '';
-    int bpl_id = box.read('bpl_id') ?? 0;
+   
     final result = await showSubmitDialog(context);
     if (result == null) return;
+     String warehouse_code =  selectedWarehouse.value?["warehouseCode"] ?? box.read('warehouse_code');
+    final warehouse = {'warehouse_code': warehouse_code};
+
+    final data = await _apiServices.getWarehouseAuth(warehouse);
+    int bpl_id = data?['bpl_id'] ?? box.read('bpl_id');
+    final sapDb = data?['sap_db_name'] ?? box.read('sap_db_name');
+    final sapUser = data?['sap_username'] ?? '';
+    final sapPass = data?['sap_password'] ?? '';
+
+    final loginSuccess = await _apiService.LoginSAP(
+      sap_db: sapDb,
+      sap_username: sapUser,
+      sap_pass: sapPass,
+    );
+    if (!loginSuccess) {
+      Get.snackbar(
+        "Session Expired",
+        "Gagal login ulang. Silakan login manual.",
+        snackPosition: SnackPosition.TOP,
+      );
+      box.erase();
+      Get.offAllNamed('/login');
+    }
 
     final payload = {
       "DocDate": result['DocDate'],
@@ -476,8 +591,8 @@ class StockInController extends GetxController {
 
     isLoading.value = true;
     final success = await _apiService.postGoodsReceiptNonPo(payload);
-    isLoading.value = false;
-
+     print('stock in controller post:  $success');
+//final success=true;
     if (success) {
       Get.snackbar(
         'Success',
@@ -485,8 +600,13 @@ class StockInController extends GetxController {
         snackPosition: SnackPosition.TOP,
         backgroundColor: Colors.green.shade700,
         colorText: Colors.white,
+        duration: Duration(seconds: 3),
       );
-      resetForm();
+
+      // Delay reset form biar snackbar sempat muncul
+      Future.delayed(Duration(milliseconds: 500), () {
+        resetForm();
+      });
     } else {
       Get.snackbar(
         'Failed',
@@ -544,8 +664,7 @@ class StockInController extends GetxController {
       if (itemIndex != -1) {
         final item = poItems[itemIndex];
         final openQty = item["RemainingOpenInventoryQuantity"] ?? 0;
-        final currentQty = item["currentReceivedQuantity"] ?? 0;
-
+        final currentQty = item["currentReceivedQuantity"] ?? 0; 
         if (currentQty < openQty) {
           updatePoItemQuantity(itemIndex, currentQty + 1);
         } else {
@@ -592,7 +711,7 @@ class StockInController extends GetxController {
         if (itemName != "") {
           nonPoItems.add({
             "ItemCode": scannedValue,
-            "ItemName": itemName,
+            "ItemName": itemName, 
             "currentReceivedQuantity": 1.0,
           });
         } else {
@@ -604,6 +723,8 @@ class StockInController extends GetxController {
             colorText: Colors.white,
           );
         }
+
+        
       }
     }
   }

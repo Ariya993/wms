@@ -79,7 +79,7 @@ class HomeController extends GetxController {
          box.write('warehouse_name', data[0]['WarehouseName']);
         box.write('warehouse_code', data[0]['warehouse_code']);
         box.write('bpl_id', data[0]['BusinessPlaceID']);
-        box.write('id_atasan', data[0]['id_atasan']);
+        box.write('atasan', data[0]['atasan']);
         box.write('refreshToken', data[0]['RefreshToken']);
         box.write('refreshTokenExpiryTime', data[0]['RefreshTokenExpiryTime']);
          
@@ -100,7 +100,7 @@ class HomeController extends GetxController {
           return;
         } 
 
-        await Future.delayed(Duration(milliseconds: 300));
+        await Future.delayed(Duration(milliseconds: 200));
         // await fetchConfig();
 
         // await Future.delayed(Duration(milliseconds: 300));
@@ -116,7 +116,7 @@ class HomeController extends GetxController {
           );
           // Tapi kita tetap lanjut
         }
-        await Future.delayed(Duration(milliseconds: 300));
+        await Future.delayed(Duration(milliseconds: 200));
         await fetchMenus();
       } else {
         Get.snackbar(

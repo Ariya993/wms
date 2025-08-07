@@ -5,13 +5,14 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:get_storage/get_storage.dart'; 
-import 'package:http/http.dart' as http; 
+import 'package:get_storage/get_storage.dart';
+import 'package:http/http.dart' as http;
 import 'package:niimbot_label_printer/niimbot_label_printer.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:wms/helper/endpoint.dart';
 import 'package:image/image.dart' as img;
+
 class PrinterController extends GetxController {
   final niimbot = NiimbotLabelPrinter();
   WebViewController? webViewController;
@@ -19,7 +20,7 @@ class PrinterController extends GetxController {
   final isConnected = false.obs;
   final devices = <BluetoothDevice>[].obs;
   final selectedDevice = Rx<BluetoothDevice?>(null);
-  
+
   final TextEditingController widthController = TextEditingController(
     text: "5",
   ); // mm
@@ -33,20 +34,22 @@ class PrinterController extends GetxController {
   void onInit() {
     super.onInit();
     scanPrinter();
-      widthController.text = (box.read('label_width') ?? 5).toString();
+    widthController.text = (box.read('label_width') ?? 5).toString();
     heightController.text = (box.read('label_height') ?? 3).toString();
   }
-Future<void> requestBluetoothPermissions() async {
-  if (await Permission.bluetoothConnect.isDenied ||
-      await Permission.bluetoothScan.isDenied ||
-      await Permission.locationWhenInUse.isDenied) {
-    await [
-      Permission.bluetoothConnect,
-      Permission.bluetoothScan,
-      Permission.locationWhenInUse,
-    ].request();
+
+  Future<void> requestBluetoothPermissions() async {
+    if (await Permission.bluetoothConnect.isDenied ||
+        await Permission.bluetoothScan.isDenied ||
+        await Permission.locationWhenInUse.isDenied) {
+      await [
+        Permission.bluetoothConnect,
+        Permission.bluetoothScan,
+        Permission.locationWhenInUse,
+      ].request();
+    }
   }
-}
+
   Future<void> scanPrinter() async {
     await requestBluetoothPermissions();
     final isGranted = await niimbot.requestPermissionGrant();
@@ -98,7 +101,7 @@ Future<void> requestBluetoothPermissions() async {
   Future<void> connectPrinter(BluetoothDevice device) async {
     final result = await niimbot.connect(device);
     final status = await niimbot.isConnected(); // <-- tambahkan ini
-  isConnected.value = status;
+    isConnected.value = status;
     if (result) {
       isConnected.value = true;
       selectedDevice.value = device;
@@ -180,15 +183,14 @@ Future<void> requestBluetoothPermissions() async {
   Future<Uint8List?> getBarcodeImageFromServer({
     required String itemCode,
     required String itemName,
-      required int qty,
+    required int qty,
     double cmWidth = 5,
     double cmHeight = 3,
   }) {
     final token = box.read('token');
     box.write('label_width', cmWidth);
-     box.write('label_height', cmHeight); 
-     final url =
-        "$apiBarcodeWMS?qty=$qty&cm_width=$cmWidth&cm_height=$cmHeight";
+    box.write('label_height', cmHeight);
+    final url = "$apiBarcodeWMS?qty=$qty&cm_width=$cmWidth&cm_height=$cmHeight";
     final body = {"itemCode": itemCode, "itemName": itemName};
 
     return http
@@ -216,8 +218,8 @@ Future<void> requestBluetoothPermissions() async {
           }
         })
         .catchError((e, stacktrace) {
-           print("ERROR getBarcodeImageFromServer: $e");
-  print("STACKTRACE: $stacktrace");
+          print("ERROR getBarcodeImageFromServer: $e");
+          print("STACKTRACE: $stacktrace");
           Get.snackbar(
             "Error",
             "Exception barcode:\n$e",
@@ -288,7 +290,8 @@ Future<void> requestBluetoothPermissions() async {
     });
     return completer.future;
   }
-  void printImage(Uint8List  html) async {
+
+  void printImage(Uint8List html) async {
     try {
       final isConnected = await niimbot.isConnected();
       if (!isConnected) {
@@ -299,20 +302,21 @@ Future<void> requestBluetoothPermissions() async {
           colorText: Colors.white,
         );
         //return;
-      } 
- 
+      }
+
       final Completer<ui.Image> completer = Completer();
       ui.decodeImageFromList(html, (ui.Image img) {
         completer.complete(img);
       });
       final ui.Image image = await completer.future;
 
-      final ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+      final ByteData? byteData = await image.toByteData(
+        format: ui.ImageByteFormat.rawRgba,
+      );
       final List<int> bytesImage = byteData!.buffer.asUint8List().toList();
-      print(image.height); 
+      print(image.height);
       print('----------------');
       print(image.width);
-      
 
       final printData = PrintData.fromMap({
         "bytes": bytesImage,
@@ -322,7 +326,7 @@ Future<void> requestBluetoothPermissions() async {
         "invertColor": false,
         "density": 3,
         "labelType": 1,
-      });  
+      });
       final result = await niimbot.send(printData);
       if (result) {
         Get.snackbar(
@@ -349,7 +353,8 @@ Future<void> requestBluetoothPermissions() async {
       );
     }
   }
- void printQR(Uint8List imageBytes) async {
+
+  void printQR(Uint8List imageBytes) async {
     try {
       final isConnected = await niimbot.isConnected();
       if (!isConnected) {
@@ -360,15 +365,18 @@ Future<void> requestBluetoothPermissions() async {
           colorText: Colors.white,
         );
         //return;
-      } 
+      }
 
+
+      
+      await Future.delayed(Duration(milliseconds: 500));
       final double widthCm = 5; // misalnya
       final double heightCm = 3;
       final double dpi = 8 * 10; // 8 pixel per mm = 80 per cm
 
       final int width = (widthCm * dpi).toInt();
       final int height = (heightCm * dpi).toInt();
-       
+
       final Completer<ui.Image> completer = Completer();
       ui.decodeImageFromList(imageBytes, (ui.Image img) {
         completer.complete(img);
@@ -380,18 +388,17 @@ Future<void> requestBluetoothPermissions() async {
       //final ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
 
       final List<int> bytesImage = byteData!.buffer.asUint8List().toList();
- 
-  
-print("Image Width: ${image.width}, Height: ${image.height}");
+
+      print("Image Width: ${image.width}, Height: ${image.height}");
       final printData = PrintData.fromMap({
-         "bytes": bytesImage, // atau rgba
+        "bytes": bytesImage, // atau rgba
         "width": image.width,
         "height": image.height,
         "rotate": false,
         "invertColor": false,
         "density": 3,
         "labelType": 1,
-      });  
+      });
       final result = await niimbot.send(printData);
       if (result) {
         Get.snackbar(

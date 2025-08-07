@@ -113,6 +113,8 @@ class _StockInPageState extends State<StockInPage>
     with TickerProviderStateMixin {
   final StockInController controller = Get.put(StockInController());
   late TabController _tabController;
+  final List<TextEditingController> _nonPoQtyControllers = [];
+List<TextEditingController> poItemQtyControllers = [];
 
   @override
   void initState() {
@@ -131,18 +133,116 @@ class _StockInPageState extends State<StockInPage>
         controller.setMode(StockInMode.nonPo);
       }
     });
+
+    _syncQtyControllers();
+ //initPoItemQtyControllers();
+  // Auto sync saat nonPoItems berubah
+  ever(controller.nonPoItems, (_) => _syncQtyControllers());
+  ever(controller.poItems, (_) => _syncQtyControllers());
   }
 
+ void initPoItemQtyControllers() {
+    poItemQtyControllers = controller.poItems.map((item) {
+      return TextEditingController(
+        text: item["currentReceivedQuantity"]?.toStringAsFixed(0) ?? '0',
+      );
+    }).toList();
+  }
+
+void _syncQtyControllers() {
+  final items = controller.nonPoItems;
+  while (_nonPoQtyControllers.length < items.length) {
+    final idx = _nonPoQtyControllers.length;
+    final qty = (items[idx]['currentReceivedQuantity'] ?? 0).toInt();
+    _nonPoQtyControllers.add(
+      TextEditingController(text: qty == 0 ? '' : qty.toString()),
+    );
+  }
+
+  final poitems = controller.poItems;
+  while (poItemQtyControllers.length < poitems.length) {
+    final idx = poItemQtyControllers.length;
+    final qty = (poitems[idx]['currentReceivedQuantity'] ?? 0).toInt();
+    poItemQtyControllers.add(
+      TextEditingController(text: qty == 0 ? '' : qty.toString()),
+    );
+  }
+}
   @override
   void dispose() {
     _tabController.dispose();
+     for (final c in _nonPoQtyControllers) {
+    c.dispose();
+  }
+
+ for (final c in poItemQtyControllers) {
+    c.dispose();
+  }
+
+  //  for (var controller in poItemQtyControllers) {
+  //     controller.dispose();
+  //   }
     super.dispose();
   }
 
   Future<void> _navigateToScanner() async {
     final result = await Get.to(() => const BarcodeScannerPage());
     if (result != null && result is String && result.isNotEmpty) {
-      controller.handleScanResult(result);
+      
+     controller.handleScanResult(result);
+    if(controller.currentMode.value == StockInMode.poBased)
+    {
+      if (controller.poItems.isNotEmpty)
+      {
+          final itemIndex = controller.poItems.indexWhere(
+            (item) => item["ItemCode"] == result,
+          );
+          print(itemIndex);
+          if(itemIndex >= 0)
+          { 
+            final item = controller.poItems[itemIndex];
+            final openQty = item["RemainingOpenInventoryQuantity"] ?? 0;
+            final currentQty = item["currentReceivedQuantity"] ?? 0; 
+            if (currentQty < openQty) {
+             
+                String textValue = poItemQtyControllers[itemIndex].text;
+                int cQty = textValue.isEmpty ? 0 : int.tryParse(textValue) ?? 0;
+                int newQty = cQty + 1; 
+                poItemQtyControllers[itemIndex].text = newQty.toString();
+
+            } else {
+              Get.snackbar(
+                'Max Quantity',
+                'Qty untuk "${item["ItemDescription"]}" sudah mencapai limit open ($openQty).',
+                snackPosition: SnackPosition.TOP,
+                backgroundColor: Colors.orange.shade700,
+                colorText: Colors.white,
+              );
+            }
+            
+           
+          } 
+      } 
+    }
+    else{
+      if (controller.nonPoItems.isNotEmpty)
+      {
+          final itemIndex = controller.nonPoItems.indexWhere(
+            (item) => item["ItemCode"] == result,
+          );
+          print(itemIndex);
+          if(itemIndex >= 0)
+          { 
+            String textValue = _nonPoQtyControllers[itemIndex].text;
+            int currentQty = textValue.isEmpty ? 0 : int.tryParse(textValue) ?? 0;
+            int newQty = currentQty + 1;
+
+  
+              _nonPoQtyControllers[itemIndex].text = newQty.toString();
+          } 
+      } 
+    }
+      
     }
   }
 
@@ -390,7 +490,6 @@ class _StockInPageState extends State<StockInPage>
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 10),
-
                   ListView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
@@ -425,6 +524,14 @@ class _StockInPageState extends State<StockInPage>
                                 ),
                               ),
                               const SizedBox(height: 6),
+                              Text(
+                                "Bin Loc : ${item["BinLoc"]}",
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
 
                               // Info Qty
                               Text(
@@ -441,30 +548,29 @@ class _StockInPageState extends State<StockInPage>
                                       Icons.remove_circle_outline,
                                       color: Colors.red,
                                     ),
-                                    onPressed: () {
-                                      final currentQty =
-                                          item["currentReceivedQuantity"] ??
-                                          0.0;
+                                     onPressed: () {
+                                      final currentQty = item["currentReceivedQuantity"] ?? 0.0;
                                       if (currentQty > 0) {
-                                        controller.updatePoItemQuantity(
-                                          index,
-                                          currentQty - 1,
-                                        );
+                                        final newQty = (currentQty - 1).clamp(0.0, double.infinity);
+                                        controller.updatePoItemQuantity(index, newQty);
+                                        poItemQtyControllers[index].text =
+                                            newQty == 0.0 ? '' : newQty.toInt().toString();
                                       }
-                                    },
+                                    }, 
                                   ),
                                   SizedBox(
-                                    width: 80,
+                                    width: 100,
                                     height: 38,
                                     child: TextField(
-                                      controller: TextEditingController(
-                                        text:
-                                            item["currentReceivedQuantity"] ==
-                                                    0.0
-                                                ? ''
-                                                : item["currentReceivedQuantity"]
-                                                    .toStringAsFixed(0),
-                                      ),
+                                      controller: poItemQtyControllers[index],
+                                      // controller: TextEditingController(
+                                      //   text:
+                                      //       item["currentReceivedQuantity"] ==
+                                      //               0.0
+                                      //           ? ''
+                                      //           : item["currentReceivedQuantity"]
+                                      //               .toStringAsFixed(0),
+                                      // ),
                                       textAlign: TextAlign.center,
                                       decoration: InputDecoration(
                                         hintText: "0",
@@ -493,11 +599,21 @@ class _StockInPageState extends State<StockInPage>
                                       },
                                     ),
                                   ),
+                                  
                                   IconButton(
                                     icon: const Icon(
                                       Icons.add_circle,
                                       color: Colors.green,
                                     ),
+                                    // onPressed: () {
+                                    //   final currentQty = item["currentReceivedQuantity"] ?? 0.0;
+                                    //   if (currentQty > 0) {
+                                    //     final newQty = (currentQty - 1).clamp(0.0, double.infinity);
+                                    //     controller.updatePoItemQuantity(index, newQty);
+                                    //     poItemQtyControllers[index].text =
+                                    //         newQty == 0.0 ? '' : newQty.toInt().toString();
+                                    //   }
+                                    // }, 
                                     onPressed: () {
                                       final currentQty =
                                           item["currentReceivedQuantity"] ??
@@ -506,10 +622,12 @@ class _StockInPageState extends State<StockInPage>
                                           item["RemainingOpenInventoryQuantity"] ??
                                           0.0;
                                       if (currentQty < maxQty) {
+                                          final newQty = (currentQty + 1).clamp(0.0, double.infinity);
                                         controller.updatePoItemQuantity(
                                           index,
-                                          currentQty + 1,
+                                          newQty,
                                         );
+                                         poItemQtyControllers[index].text = newQty.toInt().toString();
                                       }
                                     },
                                   ),
@@ -519,11 +637,13 @@ class _StockInPageState extends State<StockInPage>
                                       Icons.clear,
                                       color: Colors.red,
                                     ),
+                                    
                                     onPressed: () {
                                       controller.updatePoItemQuantity(
                                         index,
                                         0.0,
                                       );
+                                      poItemQtyControllers[index].text="0";
                                     },
                                   ),
                                 ],
@@ -614,21 +734,21 @@ class _StockInPageState extends State<StockInPage>
 
                         const SizedBox(height: 10),
                         TextField(
-                          controller: controller.nonPoQuantityController,
-                          decoration: InputDecoration(
-                            labelText: "Quantity",
-                            hintText: "Enter Quantity",
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
+                              controller: controller.nonPoQuantityController,
+                              decoration: InputDecoration(
+                                labelText: "Quantity",
+                                hintText: "Enter Quantity",
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                prefixIcon: const Icon(
+                                  Icons.production_quantity_limits,
+                                ),
+                              ),
+                              keyboardType: const TextInputType.numberWithOptions(
+                                decimal: false,
+                              ),
                             ),
-                            prefixIcon: const Icon(
-                              Icons.production_quantity_limits,
-                            ),
-                          ),
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                          ),
-                        ),
                         const SizedBox(height: 10),
                         SizedBox(
                           width: double.infinity,
@@ -747,25 +867,36 @@ class _StockInPageState extends State<StockInPage>
                             children: [
                               IconButton(
                                 onPressed: () {
+                                  // if (qty > 0) {
+                                  //   controller.updateNonPoItemQuantity(
+                                  //     index,
+                                  //    (qty - 1).toDouble(),
+                                  //   );
+                                  // }
                                   if (qty > 0) {
-                                    controller.updateNonPoItemQuantity(
-                                      index,
-                                      qty - 1,
-                                    );
-                                  }
+                                      final newQty = (qty - 1).toDouble();
+                                      controller.updateNonPoItemQuantity(index, newQty);
+
+                                      // ⬇️ update controller juga
+                                      _nonPoQtyControllers[index].text = newQty == 0 ? '' : newQty.toInt().toString();
+                                    }
                                 },
                                 icon: const Icon(
                                   Icons.remove_circle,
                                   color: Colors.red,
                                 ),
                               ),
+                              
+
                               SizedBox(
-                                width: 60,
+                                width: 100,
                                 height: 36,
                                 child: TextField(
-                                  controller: TextEditingController(
-                                    text: qty == 0 ? '' : qty.toString(),
-                                  ),
+                                  controller: _nonPoQtyControllers[index],
+
+                                  // controller: TextEditingController(
+                                  //   text: qty == 0 ? '' : qty.toString(),
+                                  // ),
                                   decoration: const InputDecoration(
                                     border: OutlineInputBorder(),
                                     isDense: true,
@@ -778,6 +909,7 @@ class _StockInPageState extends State<StockInPage>
                                   style: const TextStyle(fontSize: 14),
                                   keyboardType: TextInputType.number,
                                   onChanged: (value) {
+                                    print(value);
                                     controller.updateNonPoItemQuantity(
                                       index,
                                       double.tryParse(value) ?? 0,
@@ -786,11 +918,17 @@ class _StockInPageState extends State<StockInPage>
                                 ),
                               ),
                               IconButton(
-                                onPressed:
-                                    () => controller.updateNonPoItemQuantity(
-                                      index,
-                                      qty + 1,
-                                    ),
+                                 onPressed: () {
+                                  final newQty = (qty + 1).toDouble();
+                                  controller.updateNonPoItemQuantity(index, newQty);
+
+                                  _nonPoQtyControllers[index].text = newQty.toInt().toString();
+                                },
+                                // onPressed: 
+                                //     () => controller.updateNonPoItemQuantity(
+                                //       index,
+                                //       (qty + 1).toDouble(),
+                                //     ),
                                 icon: const Icon(
                                   Icons.add_circle,
                                   color: Colors.green,
@@ -802,8 +940,13 @@ class _StockInPageState extends State<StockInPage>
                                   Icons.delete,
                                   color: Colors.red,
                                 ),
-                                onPressed:
-                                    () => controller.removeNonPoItem(index),
+                                // onPressed: () {
+                                //   controller.updateNonPoItemQuantity(index, 0);
+                                //   _nonPoQtyControllers[index].text = '';
+                                // },
+
+                                 onPressed:
+                                     () => controller.removeNonPoItem(index),
                               ),
                             ],
                           ),

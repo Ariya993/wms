@@ -53,6 +53,7 @@ class _BarcodeScannerPageState extends State<BarcodeScannerPage> {
               });
             },
           ),
+          
         ],
       ),
       body: Stack(

@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -8,84 +6,49 @@ import '../controllers/pick_pack_controller.dart';
 import '../widgets/custom_dropdown_search.dart';
 import '../widgets/loading.dart';
 import 'scanner.dart';
-class PickPackManagerPage extends StatefulWidget {
+
+class PickPackManagerPage extends GetView<PickPackController> {
   const PickPackManagerPage({super.key});
 
   @override
-  State<PickPackManagerPage> createState() => _PickPackManagerPageState();
-}
+  Widget build(BuildContext context) {
+    final ScrollController scrollController = ScrollController();
+    final ItemController itemController = Get.put(ItemController());
+    final TextEditingController searchController = TextEditingController(
+      text: controller.searchQuery.value,
+    );
+    Future<void> _navigateToScanner() async {
+      final result = await Get.to(() => const BarcodeScannerPage());
+      if (result != null && result is String && result.isNotEmpty) {
+        // print(result);
+        controller.searchQuery.value = result;
+        searchController.text=result;
+        controller.scanPickableItems(
+          reset: true,
+          source: controller.filterType.value,
+          warehouse: itemController.selectedWarehouseFilter.value,
+        );
+      }
+    }
 
-class _PickPackManagerPageState extends State<PickPackManagerPage> {
-   late final PickPackController controller;
-  late final ItemController itemController;
-  late final ScrollController scrollController;
-  late final TextEditingController searchController;
-  Timer? debounceTimer;
-  void initState() {
-    super.initState();
-    controller = Get.find<PickPackController>();
-    itemController = Get.find<ItemController>();
-    scrollController = ScrollController();
-    searchController = TextEditingController(text: controller.searchQuery.value);
-     controller.fetchPickableItems(reset:true);
+    //  final TextEditingController searchController = TextEditingController(
+    //     );
     scrollController.addListener(() {
-      if (scrollController.position.pixels >= scrollController.position.maxScrollExtent - 200 && controller.hasMoreData.value) {
+      if (scrollController.position.pixels >=
+              scrollController.position.maxScrollExtent - 200 ) {
         controller.fetchPickableItems();
       }
+      // if (scrollController.position.pixels >=
+      //         scrollController.position.maxScrollExtent - 200 &&
+      //     !controller.isFetchingMore.value &&
+      //     controller.hasMoreData.value) {
+      //   controller.fetchPickableItems();
+      // }
     });
-  }
-
-  @override
-  void dispose() {
-    scrollController.dispose();
-    searchController.dispose();
-    debounceTimer?.cancel();
-    super.dispose();
-  }
-
-  Future<void> _navigateToScanner() async {
-    final result = await Get.to(() => const BarcodeScannerPage());
-    if (result != null && result is String && result.isNotEmpty) {
-      controller.searchQuery.value = result;
-      searchController.text = result;
-      controller.scanPickableItems(
-        reset: true,
-        source: controller.filterType.value,
-        warehouse: itemController.selectedWarehouseFilter.value,
-      );
-    }
-  }
-
-
-  @override
-  Widget build(BuildContext context) {
-    // final ScrollController scrollController = ScrollController();
-    // final ItemController itemController = Get.put(ItemController());
-    // final TextEditingController searchController = TextEditingController(
-    //   text: controller.searchQuery.value,
-    // );
-    
-    // Future<void> _navigateToScanner() async {
-    //   final result = await Get.to(() => const BarcodeScannerPage());
-    //   if (result != null && result is String && result.isNotEmpty) {
-    //     // print(result);
-    //     controller.searchQuery.value = result;
-    //     searchController.text=result;
-    //     controller.scanPickableItems(
-    //       reset: true,
-    //       source: controller.filterType.value,
-    //       warehouse: itemController.selectedWarehouseFilter.value,
-    //     );
-    //   }
-    // }  
-    // scrollController.addListener(() {
-    //   if (scrollController.position.pixels >=
-    //           scrollController.position.maxScrollExtent - 200 ) {
-    //     controller.fetchPickableItems();
-    //   } 
+    // searchController.addListener(() {
+    //   controller.searchQuery.value = searchController.text;
+    //   // controller.fetchPickableItems(reset: true); // Terapkan
     // });
-    
-
     return Scaffold(
       appBar: AppBar(
         title: const Text(
@@ -94,7 +57,8 @@ class _PickPackManagerPageState extends State<PickPackManagerPage> {
         ),
         iconTheme: const IconThemeData(color: Colors.white),
         backgroundColor: Colors.blue.shade700,
-        elevation: 4, 
+        elevation: 4,
+
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh, color: Colors.white),
@@ -1026,7 +990,18 @@ class _PickPackManagerPageState extends State<PickPackManagerPage> {
                                               (pickedQty > 0 &&
                                                       (pickedQty >
                                                           item.openQuantity
-                                                     
+                                                      // Perhatikan: validasi ini di UI mungkin tidak perlu
+                                                      // jika sudah ada di controller. Atau bisa jadi indikator warning.
+                                                      // item.pickedQuantity.value > item.simulatedAvailableQuantity.value
+                                                      // lebih tepatnya adalah item.pickedQuantity.value > item.originalAvailableQuantity
+                                                      // jika melihat seluruh item yang dipick untuk kode barang ini.
+                                                      // Untuk warning di UI, mungkin lebih baik pakai item.simulatedAvailableQuantity.value < 0
+                                                      // atau total picked melebihi originalAvailableQuantity
+                                                      // (item.pickedQuantity.value > item.simulatedAvailableQuantity.value + (nilai sebelum perubahan))
+                                                      // Jika Anda ingin icon warningnya muncul ketika total pick untuk itemCode itu melebihi originalAvailable
+                                                      // Maka Anda perlu menghitung ulang total picked untuk itemCode di sini atau di PickableItem.
+                                                      // Untuk kesederhanaan, mari kita pertimbangkan pickedQty > openQuantity sebagai salah satu indikator
+                                                      // atau jika totalPicked for itemCode > originalAvailableQuantity
                                                       ))
                                                   ? const Icon(
                                                     Icons.warning,
@@ -1158,7 +1133,7 @@ class _PickPackManagerPageState extends State<PickPackManagerPage> {
           ],
         );
       }),
-    ); 
+    );
   }
 
   void showPickListDialog(BuildContext context) {

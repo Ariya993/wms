@@ -147,6 +147,7 @@ class _UserGrantPageState extends State<UserGrantPage> {
           label: const Text('Save Access'),
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.blue.shade700,
+            foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(vertical: 14),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),

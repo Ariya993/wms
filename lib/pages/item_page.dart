@@ -3,109 +3,14 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
-import 'package:mobile_scanner/mobile_scanner.dart';
+// import 'package:mobile_scanner/mobile_scanner.dart';
 import '../controllers/item_controller.dart';
 // import '../controllers/print_qr_web_controller.dart';
 // import '../helper/print_qr_stub.dart';
 import '../controllers/printer_controller.dart';
 import '../controllers/print_qr_controller.dart';
 import '../widgets/loading.dart';
-
-class BarcodeScannerPage extends StatefulWidget {
-  const BarcodeScannerPage({super.key});
-
-  @override
-  State<BarcodeScannerPage> createState() => _BarcodeScannerPageState();
-}
-
-class _BarcodeScannerPageState extends State<BarcodeScannerPage> {
-  final MobileScannerController cameraController = MobileScannerController();
-  bool _isFlashOn = false;
-  bool _isFrontCamera = false;
-  bool _isScanned = false;
-
-  @override
-  void dispose() {
-    cameraController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Scan QR/Barcode',
-          style: TextStyle(color: Colors.white),
-        ),
-        backgroundColor: Colors.blue.shade700,
-        iconTheme: const IconThemeData(color: Colors.white),
-        actions: [
-          IconButton(
-            icon: Icon(
-              _isFlashOn ? Icons.flash_on : Icons.flash_off,
-              color: _isFlashOn ? Colors.yellow : Colors.white,
-            ),
-            onPressed: () {
-              cameraController.toggleTorch();
-              setState(() {
-                _isFlashOn = !_isFlashOn;
-              });
-            },
-          ),
-          IconButton(
-            icon: Icon(_isFrontCamera ? Icons.camera_front : Icons.camera_rear),
-            onPressed: () {
-              cameraController.switchCamera();
-              setState(() {
-                _isFrontCamera = !_isFrontCamera;
-              });
-            },
-          ),
-        ],
-      ),
-      body: Stack(
-        children: [
-          MobileScanner(
-            controller: cameraController,
-            onDetect: (capture) {
-              if (_isScanned) return;
-              _isScanned = true;
-              final barcode = capture.barcodes.first;
-              final code = barcode.rawValue;
-              if (code != null && code.isNotEmpty) {
-                Get.back(result: code);
-              } else {
-                _isScanned = false;
-              }
-            },
-          ),
-          Align(
-            alignment: Alignment.center,
-            child: Container(
-              width: 250,
-              height: 250,
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.red, width: 3),
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          ),
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: Container(
-              padding: const EdgeInsets.only(bottom: 20),
-              child: const Text(
-                'Arahkan QR/Barcode ke dalam bingkai',
-                style: TextStyle(color: Colors.white, fontSize: 18),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
+import 'scanner.dart';
 
 class ItemPage extends StatefulWidget {
   const ItemPage({super.key});
@@ -114,8 +19,7 @@ class ItemPage extends StatefulWidget {
   State<ItemPage> createState() => _ItemPageState();
 }
 
-class _ItemPageState extends State<ItemPage>
-    with TickerProviderStateMixin {
+class _ItemPageState extends State<ItemPage> with TickerProviderStateMixin {
   final ItemController itemController = Get.put(ItemController());
   final PrinterController printerController = Get.put(PrinterController());
   final ScrollController scrollController = ScrollController();
@@ -124,13 +28,14 @@ class _ItemPageState extends State<ItemPage>
   // ItemPage({super.key});
   @override
   void initState() {
-    super.initState(); 
+    super.initState();
   }
-   Future<void> _navigateToScanner() async {
+
+  Future<void> _navigateToScanner() async {
     final result = await Get.to(() => const BarcodeScannerPage());
     if (result != null && result is String && result.isNotEmpty) {
-       itemController.searchQuery.value = result.trim();
-                      itemController.fetchItems();
+      itemController.searchQuery.value = result.trim();
+      itemController.scanItems(); //fetchItems();
     }
   }
 
@@ -156,7 +61,7 @@ class _ItemPageState extends State<ItemPage>
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8),
             child: Row(
               children: [
                 Expanded(
@@ -186,6 +91,7 @@ class _ItemPageState extends State<ItemPage>
                     },
                   ),
                 ),
+
                 const SizedBox(width: 8),
                 SizedBox(
                   height: 48, // tinggi tombol agar terlihat kotak
@@ -211,6 +117,133 @@ class _ItemPageState extends State<ItemPage>
               ],
             ),
           ),
+          const SizedBox(width: 8),
+
+          Padding(
+            padding: const EdgeInsets.only(right: 16.0), // tambahkan ini
+            child: Align(
+              alignment: Alignment.centerRight,
+
+              child: Obx(() {
+                final warehouses = itemController.selectedWarehouses.toList();
+
+                if (warehouses.isEmpty) return const SizedBox();
+
+                return GestureDetector(
+                  onTapDown: (details) {
+                    final Offset offset = details.globalPosition;
+                    final double dx =
+                        offset.dx + MediaQuery.of(context).size.width;
+                    final double dy = offset.dy;
+
+                    showMenu(
+                      context: context,
+                      position: RelativeRect.fromLTRB(dx, dy, 0, 0),
+                      items: [
+                        PopupMenuItem<String>(
+                          enabled: false,
+                          padding:
+                              EdgeInsets.zero, // Hindari padding default item
+                          child: Obx(
+                            () => Material(
+                              color: Colors.white, // 💥 Material putih solid
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  TextField(
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                    ), // ukuran teks lebih besar
+                                    decoration: const InputDecoration(
+                                      hintText: 'Cari warehouse...',
+                                      fillColor: Colors.white,
+                                      border: OutlineInputBorder(),
+                                      isDense: true, // rapat tapi tetap nyaman
+                                      contentPadding: EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical:
+                                            12, // padding lebih luas secara vertikal
+                                      ),
+                                    ),
+                                    onChanged:
+                                        (value) => itemController
+                                            .filterWarehouseSearch(value),
+                                  ),
+
+                                  const SizedBox(height: 8),
+                                  SizedBox(
+                                    height: 350,
+                                    width: 200,
+                                    child: ListView(
+                                      shrinkWrap: true,
+                                      children:
+                                          itemController.filteredWarehouseList.map((
+                                            w,
+                                          ) {
+                                            final name =
+                                                itemController
+                                                    .warehouseCodeNameMap[w] ??
+                                                w; // cari nama
+                                            return ListTile(
+                                              title: Text(
+                                                name,
+                                              ), // ✅ tampilkan nama gudangnya
+                                              tileColor: Colors.white,
+                                              textColor: Colors.black,
+                                              onTap: () {
+                                                itemController
+                                                    .selectedWarehouseFilter
+                                                    .value = w;
+                                                itemController.resetItems();
+                                                Navigator.pop(context);
+                                              },
+                                            );
+                                          }).toList(),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 14,
+                    ),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey.shade400),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+
+                      children: [
+                        Text(
+                          itemController.selectedWarehouseFilter.value.isEmpty
+                              ? 'Warehouse'
+                              : itemController
+                                      .warehouseCodeNameMap[itemController
+                                      .selectedWarehouseFilter
+                                      .value] ??
+                                  'Warehouse',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+
+                        const Icon(Icons.arrow_drop_down),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+            ),
+          ),
           Expanded(
             child: Obx(() {
               if (itemController.isLoading.value &&
@@ -221,23 +254,19 @@ class _ItemPageState extends State<ItemPage>
 
               if (itemController.items.isEmpty &&
                   !itemController.isLoading.value) {
-                 return const Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.inventory,
-                          color: Colors.grey,
-                          size: 60,
-                        ),
-                        SizedBox(height: 10),
-                        Text(
-                          'No data Item.',
-                          style: TextStyle(color: Colors.grey, fontSize: 18),
-                        ),
-                      ],
-                    ),
-                  );      
+                return const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.inventory, color: Colors.grey, size: 60),
+                      SizedBox(height: 10),
+                      Text(
+                        'No data Item.',
+                        style: TextStyle(color: Colors.grey, fontSize: 18),
+                      ),
+                    ],
+                  ),
+                );
                 // return const Center(child: Text("Tidak ada item ditemukan."));
               }
 
@@ -280,6 +309,10 @@ class _ItemPageState extends State<ItemPage>
                     itemBuilder: (context, index) {
                       if (index < itemController.items.length) {
                         final item = itemController.items[index];
+                        final String warehouseCode =
+                            item['WarehouseCode'] ?? '';
+                        final String warehouseName =
+                            item['WarehouseName'] ?? '';
                         final String itemCode = item['ItemCode'] ?? '';
                         final String itemName = item['ItemName'] ?? '';
                         final String? binLoc = item['lokasi'] ?? '-';
@@ -321,7 +354,7 @@ class _ItemPageState extends State<ItemPage>
                                   ),
                                   child: Center(
                                     child: Text(
-                                      itemName.toUpperCase(),
+                                      '$warehouseCode - ${warehouseName.toUpperCase()}',
                                       style: const TextStyle(
                                         color: Colors.blue,
                                         fontWeight: FontWeight.bold,
@@ -348,9 +381,9 @@ class _ItemPageState extends State<ItemPage>
                                         Text(
                                           "$itemCode - $itemName",
                                           style: const TextStyle(
-                                            fontSize: 13,
-                                            color: Colors.black87,
-                                            fontWeight: FontWeight.w500,
+                                            fontSize: 12,
+                                            color: Colors.grey,
+                                            fontWeight: FontWeight.bold,
                                           ),
                                           maxLines: 2, // Allow up to 2 lines
                                           overflow: TextOverflow.ellipsis,
@@ -403,9 +436,7 @@ class _ItemPageState extends State<ItemPage>
                                                   Icons.edit_location_alt,
                                                   size: 18,
                                                 ),
-                                                label: const Text(
-                                                  "Edit Bin",
-                                                ),
+                                                label: const Text("Edit Bin"),
                                                 style: ElevatedButton.styleFrom(
                                                   backgroundColor:
                                                       Colors.orange[50],
@@ -435,59 +466,40 @@ class _ItemPageState extends State<ItemPage>
                                               ),
                                               const SizedBox(width: 8),
                                               ElevatedButton.icon(
-                                                  icon: const Icon(Icons.print, size: 18),
-                                                  label: const Text("Print"),
-                                                  style: ElevatedButton.styleFrom(
-                                                    backgroundColor: Colors.blue[50],
-                                                    foregroundColor: Colors.blue[700],
-                                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                                                    side: const BorderSide(color: Colors.blue),
-                                                    shape: RoundedRectangleBorder(
-                                                      borderRadius: BorderRadius.circular(10),
-                                                    ),
-                                                  ),
-                                                  onPressed: () {
-                                                    _showPrintTypeDialog(
-                                                      item['ItemName'] ?? '',
-                                                      item['ItemCode'] ?? '',
-                                                      item['lokasi'] ?? '', // lokasi BIN (kalau ada)
-                                                    );
-                                                  },
+                                                icon: const Icon(
+                                                  Icons.print,
+                                                  size: 18,
                                                 ),
-
-                                              // ElevatedButton.icon(
-                                              //   icon: const Icon(
-                                              //     Icons.print,
-                                              //     size: 18,
-                                              //   ),
-                                              //   label: const Text("Print"),
-                                              //   style: ElevatedButton.styleFrom(
-                                              //     backgroundColor:
-                                              //         Colors.blue[50],
-                                              //     foregroundColor:
-                                              //         Colors.blue[700],
-                                              //     padding:
-                                              //         const EdgeInsets.symmetric(
-                                              //           horizontal: 14,
-                                              //           vertical: 10,
-                                              //         ),
-                                              //     side: const BorderSide(
-                                              //       color: Colors.blue,
-                                              //     ),
-                                              //     shape: RoundedRectangleBorder(
-                                              //       borderRadius:
-                                              //           BorderRadius.circular(
-                                              //             10,
-                                              //           ),
-                                              //     ),
-                                              //   ),
-                                              //   onPressed: () {
-                                              //     _showPrintDialog(
-                                              //       item['ItemName'],
-                                              //       item['ItemCode'],
-                                              //     );
-                                              //   },
-                                              // ),
+                                                label: const Text("Print"),
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor:
+                                                      Colors.blue[50],
+                                                  foregroundColor:
+                                                      Colors.blue[700],
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        horizontal: 14,
+                                                        vertical: 10,
+                                                      ),
+                                                  side: const BorderSide(
+                                                    color: Colors.blue,
+                                                  ),
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          10,
+                                                        ),
+                                                  ),
+                                                ),
+                                                onPressed: () {
+                                                  _showPrintTypeDialog(
+                                                    item['ItemName'] ?? '',
+                                                    item['ItemCode'] ?? '',
+                                                    item['lokasi'] ??
+                                                        '', // lokasi BIN (kalau ada)
+                                                  );
+                                                },
+                                              ),
                                             ],
                                           ),
                                         ),
@@ -602,7 +614,7 @@ class _ItemPageState extends State<ItemPage>
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: ElevatedButton.icon( 
+                      child: ElevatedButton.icon(
                         label: const Text("Update"),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.green,
@@ -610,30 +622,31 @@ class _ItemPageState extends State<ItemPage>
                         ),
                         onPressed: () async {
                           if (formKey.currentState!.validate()) {
-                           final success = await itemController.updateBinLocation(
-                              itemCode: itemCode ?? '',
-                              warehouseCode: warehouseCode ?? '',
-                              lokasiBaru: lokasiController.text.trim(),
-                            );
+                            final success = await itemController
+                                .updateBinLocation(
+                                  itemCode: itemCode ?? '',
+                                  warehouseCode: warehouseCode ?? '',
+                                  lokasiBaru: lokasiController.text.trim(),
+                                );
                             if (success) {
                               Get.back(); // Tutup dialog input lokasi
- 
-                               Get.snackbar(
-                                    "Success",
-                                    "Bin loccation updated",
-                                    backgroundColor: Colors.green,
-                                    colorText: Colors.white,
-                                  );
+
+                              Get.snackbar(
+                                "Success",
+                                "Bin loccation updated",
+                                backgroundColor: Colors.green,
+                                colorText: Colors.white,
+                              );
                               // Delay sedikit biar snackbar muncul dulu
                               await Future.delayed(Duration(milliseconds: 300));
                             } else {
-                               Get.back();
-                                 Get.snackbar(
-                                    "Failed",
-                                    "Failed to update bin location",
-                                    backgroundColor: Colors.red,
-                                    colorText: Colors.white,
-                                  ); 
+                              Get.back();
+                              Get.snackbar(
+                                "Failed",
+                                "Failed to update bin location",
+                                backgroundColor: Colors.red,
+                                colorText: Colors.white,
+                              );
                               await Future.delayed(Duration(milliseconds: 300));
                             }
                           }
@@ -650,48 +663,53 @@ class _ItemPageState extends State<ItemPage>
       barrierDismissible: false,
     );
   }
-void _showPrintTypeDialog(String itemName, String itemCode, String lokasiBin) {
-  Get.defaultDialog(
-    title: "QR Type",
-    middleText: "",
-    radius: 5,
-    actions: [
-      ElevatedButton.icon(
-        icon: const Icon(Icons.qr_code),
-        label: const Text("QR Item"),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.green,
-          foregroundColor: Colors.white,
+
+  void _showPrintTypeDialog(
+    String itemName,
+    String itemCode,
+    String lokasiBin,
+  ) {
+    Get.defaultDialog(
+      title: "QR Type",
+      middleText: "",
+      radius: 5,
+      actions: [
+        ElevatedButton.icon(
+          icon: const Icon(Icons.qr_code),
+          label: const Text("QR Item"),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.green,
+            foregroundColor: Colors.white,
+          ),
+          onPressed: () {
+            Get.back(); // tutup dialog
+            _showPrintDialog(itemName, itemCode); // QR Item normal
+          },
         ),
-        onPressed: () {
-          Get.back(); // tutup dialog
-          _showPrintDialog(itemName, itemCode); // QR Item normal
-        },
-      ),
-      ElevatedButton.icon(
-        icon: const Icon(Icons.location_on),
-        label: const Text("QR Bin"),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.orange,
-          foregroundColor: Colors.white,
+        ElevatedButton.icon(
+          icon: const Icon(Icons.location_on),
+          label: const Text("QR Bin"),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.orange,
+            foregroundColor: Colors.white,
+          ),
+          onPressed: () {
+            if (lokasiBin.trim().isEmpty) {
+              Get.snackbar(
+                "Invalid",
+                "Bin Location is not valid area",
+                backgroundColor: Colors.red,
+                colorText: Colors.white,
+              );
+              return;
+            }
+            Get.back(); // tutup dialog
+            _showPrintDialog(lokasiBin, lokasiBin); // QR Bin
+          },
         ),
-        onPressed: () {
-          if (lokasiBin.trim().isEmpty) {
-            Get.snackbar(
-              "Invalid",
-              "Bin Location is not valid area",
-              backgroundColor: Colors.red,
-              colorText: Colors.white,
-            );
-            return;
-          }
-          Get.back(); // tutup dialog
-          _showPrintDialog(lokasiBin, lokasiBin); // QR Bin
-        },
-      ),
-    ],
-  );
-}
+      ],
+    );
+  }
 
   void _showPrintDialog(String itemName, String itemCode) {
     final qtyController = TextEditingController();
@@ -734,7 +752,9 @@ void _showPrintTypeDialog(String itemName, String itemCode, String lokasiBin) {
                     child: Column(
                       children: [
                         Text(
-                          itemName == itemCode ? "Bin: $itemName" : "Item: $itemName",
+                          itemName == itemCode
+                              ? "Bin: $itemName"
+                              : "Item: $itemName",
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
@@ -873,7 +893,7 @@ void _showPrintTypeDialog(String itemName, String itemCode, String lokasiBin) {
                                   previewHtml.value!,
                                   fit: BoxFit.contain,
                                 ),
-                              ), 
+                              ),
                             ),
                           ),
                       ],
@@ -900,6 +920,28 @@ void _showPrintTypeDialog(String itemName, String itemCode, String lokasiBin) {
                       Expanded(
                         child: ElevatedButton.icon(
                           onPressed: () async {
+                            final qty = int.tryParse(qtyController.text) ?? 1;
+
+                            // Simpan ke GetStorage
+
+                            isLoading.value = true;
+
+                            final htmlResult = await printerController
+                                .getBarcodeImageFromServer(
+                                  itemCode: itemCode,
+                                  itemName: itemName,
+                                  qty: qty,
+                                  cmWidth: double.parse(
+                                    printerController.widthController.text,
+                                  ),
+                                  cmHeight: double.parse(
+                                    printerController.heightController.text,
+                                  ),
+                                );
+
+                            if (htmlResult != null) {
+                              previewHtml.value = htmlResult;
+                            }
                             if (previewHtml.value == null) {
                               Get.snackbar(
                                 "Warning",
@@ -940,6 +982,170 @@ void _showPrintTypeDialog(String itemName, String itemCode, String lokasiBin) {
         ),
       ),
       barrierDismissible: false,
+    );
+  }
+
+  void showWarehouseFilterMenu(BuildContext context, Offset offset) {
+    final controller = itemController;
+    controller.filteredWarehouseList.assignAll(controller.selectedWarehouses);
+
+    showDialog(
+      context: context,
+      barrierColor: Colors.white,
+      builder: (context) {
+        return Stack(
+          children: [
+            Positioned(
+              left: offset.dx,
+              top: offset.dy,
+              child: Material(
+                elevation: 4,
+                borderRadius: BorderRadius.circular(12),
+                color: Colors.white,
+                child: Container(
+                  width: 250,
+                  padding: const EdgeInsets.all(8),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextField(
+                        decoration: InputDecoration(
+                          hintText: 'Cari warehouse...',
+                          prefixIcon: const Icon(Icons.search),
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        onChanged:
+                            (value) =>
+                                itemController.filterWarehouseSearch(value),
+                      ),
+                      const SizedBox(height: 8),
+                      Obx(
+                        () => Container(
+                          color: Colors.white,
+                          constraints: const BoxConstraints(maxHeight: 380),
+                          child: ListView.builder(
+                            itemCount:
+                                itemController.filteredWarehouseList.length,
+                            itemBuilder: (_, index) {
+                              final w =
+                                  itemController.filteredWarehouseList[index];
+                              return InkWell(
+                                // onTap: () {
+                                //   itemController.selectedWarehouseFilter.value =
+                                //       w;
+                                //   itemController.resetItems();
+                                //   Navigator.pop(context);
+                                // },
+                                onTap: () {
+                                  itemController.selectedWarehouseFilter.value =
+                                      w;
+                                  itemController.resetItems();
+                                  Navigator.pop(context);
+                                },
+
+                                hoverColor: Colors.blue.withOpacity(0.1),
+                                child: Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 10,
+                                  ),
+                                  decoration: const BoxDecoration(
+                                    color: Colors.white,
+                                  ),
+                                  child: Text(
+                                    w,
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.black,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void showWarehouseFilterBottomSheet(BuildContext context) {
+    final itemController = Get.find<ItemController>();
+    itemController.filteredWarehouseList.assignAll(
+      itemController.selectedWarehouses,
+    );
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+      ),
+      builder: (_) {
+        return Padding(
+          padding: MediaQuery.of(context).viewInsets,
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            height: 500,
+            child: Column(
+              children: [
+                TextField(
+                  autofocus: true,
+                  style: const TextStyle(fontSize: 16),
+                  decoration: const InputDecoration(
+                    hintText: 'Cari warehouse...',
+                    border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 12,
+                    ),
+                  ),
+                  onChanged:
+                      (value) => itemController.filterWarehouseSearch(value),
+                ),
+                const SizedBox(height: 16),
+                Expanded(
+                  child: Obx(
+                    () => ListView.builder(
+                      itemCount: itemController.filteredWarehouseList.length,
+                      itemBuilder: (_, index) {
+                        final code =
+                            itemController.filteredWarehouseList[index];
+                        final name =
+                            itemController.warehouseCodeNameMap[code] ?? code;
+                        return ListTile(
+                          title: Text(name),
+                          onTap: () {
+                            itemController.selectedWarehouseFilter.value = code;
+                            itemController.resetItems();
+                            Navigator.pop(context);
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

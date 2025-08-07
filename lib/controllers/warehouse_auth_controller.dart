@@ -16,7 +16,7 @@ var sapUsername = ''.obs;
 var sapPassword = ''.obs;
   var warehouseUsernames = <String, String>{}.obs;
   var warehousePasswords = <String, String>{}.obs;
-
+ var selectedWarehouses = <String>{}.obs;
   final box = GetStorage();
 
   // List untuk menyimpan data warehouse
@@ -45,13 +45,37 @@ var sapPassword = ''.obs;
     loadWarehouses();
   }
 
-  void loadWarehouses() async {
+  Future<void> loadWarehouses() async {
     isLoading.value = true;
     try {
       final fetchedWarehouses = await _apiService.getWarehouses();
+    
       warehouses.value = fetchedWarehouses;
-      filteredWarehouses.value =
-          fetchedWarehouses; // Default filter is all warehouses
+      filteredWarehouses.value = fetchedWarehouses; // Default filter is all warehouses 
+    } catch (e) {
+      Get.snackbar(
+        "Error",
+        "Failed to load warehouse: $e",
+        snackPosition: SnackPosition.TOP,
+        snackStyle: SnackStyle.FLOATING,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    } finally {
+      isLoading.value = false;
+    }
+  }
+void loadUserWarehouses(int userId) async {
+    isLoading.value = true;
+   
+    try {
+    await loadWarehouses();
+         final assigned = await _apiService.getUserWarehouse(userId.toString()); 
+         selectedWarehouses.value = assigned
+    .map<String>((e) => e['warehouse_code'].toString())
+    .toSet();
+ 
+        // selectedWarehouses.value = assigned.map<String>((e) => e.toString()).toSet();
     } catch (e) {
       Get.snackbar(
         "Error",
@@ -66,6 +90,35 @@ var sapPassword = ''.obs;
     }
   }
 
+  void toggleSelectAll() {
+    final allCodes = filteredWarehouses
+        .map<String>((w) => w['warehouseCode'].toString())
+        .toSet();
+
+    final isAllSelected = allCodes.every((code) => selectedWarehouses.contains(code));
+    if (isAllSelected) {
+      selectedWarehouses.removeAll(allCodes);
+    } else {
+      selectedWarehouses.addAll(allCodes);
+    }
+  }
+
+ void toggleWarehouseSelection(String warehouseId) {
+    if (selectedWarehouses.contains(warehouseId)) {
+      selectedWarehouses.remove(warehouseId);
+    } else {
+      selectedWarehouses.add(warehouseId);
+    }
+  }
+
+  Future<void> saveWarehouseSetting(int userId) async {
+    try {
+        await _apiService.saveUserWarehouses(userId, selectedWarehouses.toList());
+      ///Get.snackbar('Sukses', 'Warehouse berhasil disimpan');
+    } catch (e) {
+      Get.snackbar('Error', 'Gagal menyimpan warehouse: $e');
+    }
+  }
   // Fungsi filter untuk mencari warehouse
   void filterWarehouses(String query) {
     if (query.isEmpty) {

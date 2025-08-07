@@ -327,6 +327,106 @@ Future<List<Map<String, dynamic>>> getPickers() async {
   }
 }
 
+Future<bool> saveUserWarehouses(int userId, List<String> warehouseCodes) async {
+  // final url = Uri.parse('$apiMenuWMS'); // Sesuaikan endpoint kamu
+    final user = box.read('username');
+    final body = {
+      'appuser_id': userId,
+      'warehouses': warehouseCodes,
+      'user_created': user,
+    };
+
+try {
+      final response = await http.post(
+        Uri.parse(apiUserWarehouseWMS),
+        headers: _getHeaders(),
+        body: json.encode(body),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        Get.snackbar("Success", "Setting warehouse success",snackPosition: SnackPosition.TOP,snackStyle: SnackStyle.FLOATING,backgroundColor: Colors.green, colorText: Colors.white);
+        return true;
+      } else {
+        final errorData = json.decode(response.body);
+        String errorMessage = "Error";
+
+        if (errorData['errors'] != null) {
+          // Ambil semua pesan error dari field 'errors'
+          final errors = errorData['errors'] as Map<String, dynamic>;
+          errorMessage = errors.entries
+              .map((e) => "${e.key}: ${e.value.join(', ')}")
+              .join('\n');
+        } else if (errorData['message'] != null) {
+          errorMessage = errorData['message'];
+        }
+
+        Get.snackbar("Error", errorMessage);
+        print("Failed to setting warehouse: ${response.body}");
+        return false;
+      }
+    } catch (e) {
+      Get.snackbar("Error", "Failed to setting warehouse: $e");
+      print("Error setting warehouse: $e");
+      return false;
+    }
+
+
+  // final response = await http.post(
+  //   url,
+  //   headers: {
+  //     'Content-Type': 'application/json',
+  //     'Authorization': 'Bearer ${getToken()}', // kalau pakai token
+  //   },
+  //   body: jsonEncode(body),
+  // );
+
+  // if (response.statusCode != 200) {
+  //   throw Exception('Failed to save user warehouses: ${response.body}');
+  // }
+}
+
+Future<List<Map<String, dynamic>>> getUserWarehouse(String appuser_id) async {
+    try {
+        final headers = _getHeaders(); 
+// print (appuser_id);
+// print(headers);
+      final response = await http.get(
+        Uri.parse('$apiUserWarehouseWMS?appuser_id=$appuser_id'),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) { 
+        
+        final decoded = json.decode(response.body);
+//         print(response.body);
+// print(decoded.runtimeType); // cek apakah Map
+// print(decoded['data'].runtimeType); // cek apakah List
+// print(decoded['data']); // lihat isi list-nya
+
+        if (decoded is Map<String, dynamic> && decoded.containsKey('data')) {
+          final dataList = decoded['data'];
+          if (dataList is List) {
+            return dataList
+                .whereType<Map<String, dynamic>>()
+                .toList(); // aman tanpa throw
+          }
+        } 
+
+      return []; 
+      } else {
+        Get.snackbar(
+          "Error",
+          "Gagal mengambil data WMS user warehouse : ${response.statusCode}",
+        );
+        print("Response body: ${response.body}");
+        return [];
+      }
+    } catch (e) {
+      Get.snackbar("Error", "Terjadi kesalahan saat mengambil user warehouse: $e");
+      print("Error fetching user warehouse: $e");
+      return [];
+    }
+  }
 
 
 }

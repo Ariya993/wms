@@ -2,10 +2,12 @@ import 'package:get/get.dart';
 import 'package:wms/controllers/home_controller.dart';
 import 'package:wms/helper/list_user_binding.dart';
 import 'package:wms/pages/pick_pack_page.dart';
+import '../helper/list_inventory_binding.dart';
 import '../helper/pick_pack_binding.dart';
 import '../helper/picklist_binding.dart';
 import '../helper/stock_in_binding.dart';
 import '../helper/warehouse_auth_binding.dart';
+import '../pages/list_inventory_in_page.dart';
 import '../pages/login_page.dart';
 import '../pages/home_page.dart'; 
 import '../pages/item_page.dart'; 
@@ -15,6 +17,7 @@ import '../helper/printer_binding.dart';
 import '../helper/item_binding.dart';
 import '../pages/stock_in_page.dart';
 import '../pages/list_user_page.dart';
+import '../pages/unsupported_version.dart';
 import '../pages/warehouse_auth_page.dart';
 class AppRoutes { 
 
@@ -26,6 +29,7 @@ class AppRoutes {
           Get.lazyPut(() => HomeController());
         }),
       ),
+      GetPage(name: '/unsupported', page: () => UnsupportedVersionPage()),
       GetPage(name: '/login', page: () => LoginPage()),
       GetPage(
         name: '/select-printer',
@@ -61,6 +65,11 @@ class AppRoutes {
         name: '/warehouse-auth',
         page: () => WarehouseAuthPage(),
         binding: WarehouseAuthBinding(),  
+      ),
+      GetPage(
+        name: '/listinventory',
+        page: () => ListInventoryInPage(),
+        binding: ListInventoryBinding(),  
       ),
   ];
 }

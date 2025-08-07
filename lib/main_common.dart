@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -7,10 +8,15 @@ import 'package:get_storage/get_storage.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:http/http.dart' as http;
+import 'package:wms/pages/unsupported_version.dart';
+import 'package:wms/splashscreen_page.dart';
 import 'firebase_options_prod.dart' as prod_options;
 import 'firebase_options_dev.dart' as dev_options;
 // import 'firebase_options_prod.dart' as prod_options;
 
+import 'helper/endpoint.dart';
+import 'pages/internet_checker.dart';
 import 'routes/app_routes.dart';
 import 'pages/login_page.dart';
 import 'pages/home_page.dart';
@@ -19,7 +25,7 @@ import 'package:wms/services/sap_service.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart'; 
- 
+ import 'package:package_info_plus/package_info_plus.dart';
 // import 'package:printing/printing.dart';
 //import 'splashscreen_page.dart';
 
@@ -29,17 +35,50 @@ enum Environment { dev, prod }
 
 late final Environment appEnvironment;
 
+
+// Future<void> checkVersion() async {
+//   try {
+//     final info = await PackageInfo.fromPlatform();
+//     String currentVersion = info.version;
+
+//     final response = await http.get(Uri.parse(apiVersionWMS));
+
+//     if (response.statusCode != 200) 
+//     {
+//        Get.offAll(() => const UnsupportedVersionPage());
+//     }
+
+//     final data = jsonDecode(response.body);
+//     String latestVersion = data['version']?? '0'; // contoh: "1.0.0+3"
+//   print(latestVersion);
+//   print(currentVersion);
+//     if (currentVersion != latestVersion) {
+//       Get.offAll(() => const UnsupportedVersionPage()); 
+//     }
+//   } catch (e) {
+//     print("Version check error: $e");
+//   }
+// }
+
 Future<void> mainCommon(Environment  env) async {
    appEnvironment = env;
   WidgetsFlutterBinding.ensureInitialized();
   await GetStorage.init();
   // await Printing.init();
   // await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform); 
-  await Firebase.initializeApp(
-  options: env == Environment.dev
-      ? dev_options.DefaultFirebaseOptions.currentPlatform
-      : prod_options.DefaultFirebaseOptions.currentPlatform,
-);
+
+
+  // await Firebase.initializeApp(
+  // options: env == Environment.dev
+  //     ? dev_options.DefaultFirebaseOptions.currentPlatform
+  //     : prod_options.DefaultFirebaseOptions.currentPlatform,
+//);
+final firebaseOptions = env == Environment.dev
+    ? dev_options.DefaultFirebaseOptions.currentPlatform
+    : prod_options.DefaultFirebaseOptions.currentPlatform;
+
+await Firebase.initializeApp(options: firebaseOptions);
+
 
  
 
@@ -54,7 +93,7 @@ Future<void> mainCommon(Environment  env) async {
 
   await _initializeNotifications();
   await _setupInteractedMessage();
-  
+  // await checkVersion(); 
   runApp(MyApp(env: env));
   //runApp(const MyApp());
 }
@@ -76,16 +115,14 @@ class MyApp extends StatelessWidget {
         Get.find<ApiService>().refreshToken();
       }
     }
-
-    return GetMaterialApp(
+  return   GetMaterialApp(
       debugShowCheckedModeBanner: false,
       title: (env==Environment.dev ? 'DEV WMS Apps' :'WMS Apps'),
-      home: token != null ? HomePage() : LoginPage(),
-      //  home: const SplashScreenPage(),
-      // theme: ThemeData(
-      //   colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue.shade700),
-      //   useMaterial3: true,
-      // ),
+      //  home: token != null ? HomePage() : LoginPage(),
+        home:  SplashScreenPage(),
+      builder: (context, child) {
+        return InternetChecker(child: child!); // Ini menyisipkan pengecek internet ke seluruh app
+      },
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
           seedColor: Colors.blueAccent, // Warna dasar untuk menghasilkan palet
@@ -103,14 +140,7 @@ class MyApp extends StatelessWidget {
           foregroundColor: Colors.white,     // Warna teks dan ikon di AppBar
           elevation: 2, // Shadow di bawah AppBar
           centerTitle: true,
-        ), 
-        // elevatedButtonTheme: ElevatedButtonThemeData(
-        //   style: ElevatedButton.styleFrom(
-        //     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        //     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        //     textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-        //   ),
-        // ),
+        ),  
         snackBarTheme: SnackBarThemeData(
           behavior: SnackBarBehavior.floating, // Snackbar muncul di atas FAB
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -132,7 +162,7 @@ class MyApp extends StatelessWidget {
         )
       ),
       getPages: AppRoutes.routes,
-    );
+    ); 
   }
 }
 

@@ -12,6 +12,8 @@ import 'package:wms/main_common.dart';
 import '../helper/endpoint.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 
+import 'home_controller.dart';
+
 class LoginController extends GetxController {
   final usernameController = TextEditingController();
   final passwordController = TextEditingController();
@@ -57,6 +59,11 @@ class LoginController extends GetxController {
         await box.write('internalkey', result['internalKey']);
         await _sendFcmTokenToServer(usernameController.text);
         await sendDeviceInfoToBackend(result['internalKey']);
+        if (!Get.isRegistered<HomeController>()) {
+          Get.put(HomeController());
+        }
+         Get.find<HomeController>().fetchData();
+         
         Get.offNamed('/home');
       } else if (resp.statusCode == 401) {
         Get.snackbar(

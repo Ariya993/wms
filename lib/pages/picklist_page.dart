@@ -1,42 +1,38 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
+import 'package:wms/controllers/item_controller.dart';
 
 import '../controllers/picklist_controller.dart';
+import '../helper/format.dart';
+import '../widgets/loading.dart';
 import '../widgets/statusbadge.dart';
 import 'picklist_detail_page.dart';
-
-class PicklistsPage extends StatelessWidget {
+class PicklistsPage extends StatefulWidget {
   const PicklistsPage({super.key});
 
   @override
+  State<PicklistsPage> createState() => _PicklistsPageState();
+}
+
+class _PicklistsPageState extends State<PicklistsPage> {
+  // const PicklistsPage({super.key});
+ late final PicklistController controller = Get.put(PicklistController());
+  late  final ItemController itemController = Get.put(ItemController());
+
+  // @override
+  // void dispose() {
+  //   scrollController.dispose();
+  //   searchController.dispose();
+  //   debounceTimer?.cancel();
+  //   super.dispose();
+  // }
+
+  @override
   Widget build(BuildContext context) {
-    final PicklistController controller = Get.put(PicklistController());
+   
     final ColorScheme colorScheme = Theme.of(context).colorScheme;
-    String _formatPickDate(String? rawDate) {
-      if (rawDate == null || rawDate.isEmpty) return '-';
-      try {
-        final parsedDate = DateTime.parse(rawDate);
-        return DateFormat('dd-MMM-yyyy').format(parsedDate);
-      } catch (_) {
-        return '-';
-      }
-    }
-
-    // Hitung total released & closed
-    // int totalReleased =
-    //     controller.displayedPicklists.where((p) => p['Status'] == 'R').length;
-    // int totalClosed =
-    //     controller.displayedPicklists.where((p) => p['Status'] == 'C').length;
-
-    // int totalReleased = controller.allPicklists
-    //     .where((p) => p['Status']?.toString().toUpperCase() == 'R')
-    //     .length;
-
-    // int totalClosed = controller.allPicklists
-    //     .where((p) => p['Status']?.toString().toUpperCase() == 'C')
-    //     .length;
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Pick List Manager'),
@@ -54,8 +50,8 @@ class PicklistsPage extends StatelessWidget {
                       child: Text('Released (Open)'),
                     ),
                     const PopupMenuItem<String>(
-                      value: 'C',
-                      child: Text('Closed'),
+                      value: 'Y',
+                      child: Text('Closed (Picked)'),
                     ),
                   ],
               child: Padding(
@@ -83,14 +79,15 @@ class PicklistsPage extends StatelessWidget {
           IconButton(
             icon: Icon(Icons.refresh, color: colorScheme.onPrimary),
             tooltip: 'Refresh Picklists',
-            onPressed: () => controller.fetchPickList(),
+            onPressed: () => controller.fetchPickList(reset: true),
           ),
         ],
         elevation: 2,
       ),
+
       body: Obx(() {
         if (controller.isLoading.value) {
-          return const Center(child: CircularLoadingIndicator());
+          return const Loading();
         }
 
         if (controller.errorMessage.value.isNotEmpty) {
@@ -131,192 +128,418 @@ class PicklistsPage extends StatelessWidget {
           );
         }
 
-        if (controller.displayedPicklists.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.inbox_outlined, color: Colors.grey[400], size: 80),
-                const SizedBox(height: 24),
-                Text(
-                  'No picklists found for ${controller.selectedStatusFilter.value == 'R' ? 'Released' : 'Closed'} status.',
-                  style: TextStyle(color: Colors.grey[600], fontSize: 18),
-                  textAlign: TextAlign.center,
+        return Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 8.0, right: 16.0),
+              // padding: const EdgeInsets.only(right: 16.0), // tambahkan ini
+              child: Align(
+                alignment: Alignment.centerRight,
+
+                child: Obx(() {
+                  final warehouses = itemController.selectedWarehouses.toList();
+
+                  if (warehouses.isEmpty) return const SizedBox();
+
+                  return GestureDetector(
+                    onTapDown: (details) {
+                      final Offset offset = details.globalPosition;
+                      final double dx =
+                          offset.dx + MediaQuery.of(context).size.width;
+                      final double dy = offset.dy;
+
+                      showMenu(
+                        context: context,
+                        position: RelativeRect.fromLTRB(dx, dy, 0, 0),
+                        items: [
+                          PopupMenuItem<String>(
+                            enabled: false,
+                            padding:
+                                EdgeInsets.zero, // Hindari padding default item
+                            child: Obx(
+                              () => Material(
+                                color: Colors.white, // 💥 Material putih solid
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    TextField(
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                      ), // ukuran teks lebih besar
+                                      decoration: const InputDecoration(
+                                        hintText: 'Cari warehouse...',
+                                        fillColor: Colors.white,
+                                        border: OutlineInputBorder(),
+                                        isDense:
+                                            true, // rapat tapi tetap nyaman
+                                        contentPadding: EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical:
+                                              12, // padding lebih luas secara vertikal
+                                        ),
+                                      ),
+                                      onChanged:
+                                          (value) => itemController
+                                              .filterWarehouseSearch(value),
+                                    ),
+
+                                    const SizedBox(height: 8),
+                                    SizedBox(
+                                      height: 350,
+                                      width: 200,
+                                      child: ListView(
+                                        shrinkWrap: true,
+                                        children:
+                                            itemController.filteredWarehouseList.map((
+                                              w,
+                                            ) {
+                                              final name =
+                                                  itemController
+                                                      .warehouseCodeNameMap[w] ??
+                                                  w; // cari nama
+                                              return ListTile(
+                                                title: Text(
+                                                  name,
+                                                ), // ✅ tampilkan nama gudangnya
+                                                tileColor: Colors.white,
+                                                textColor: Colors.black,
+                                                onTap: () {
+                                                  itemController
+                                                      .selectedWarehouseFilter
+                                                      .value = w;
+                                                  controller.fetchPickList(
+                                                    reset: true,
+                                                    source:
+                                                        controller
+                                                            .searchQuery
+                                                            .value,
+                                                    warehouse: w,
+                                                  );
+                                                  Navigator.pop(context);
+                                                },
+                                              );
+                                            }).toList(),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 14,
+                      ),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade400),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+
+                        children: [
+                          Text(
+                            itemController.selectedWarehouseFilter.value.isEmpty
+                                ? 'Warehouse'
+                                : itemController
+                                        .warehouseCodeNameMap[itemController
+                                        .selectedWarehouseFilter
+                                        .value] ??
+                                    'Warehouse',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+
+                          const Icon(Icons.arrow_drop_down),
+                        ],
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            ),
+            if (controller.displayedPicklists.isEmpty)
+              Expanded(
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.inbox_outlined,
+                        color: Colors.grey[400],
+                        size: 80,
+                      ),
+                      const SizedBox(height: 24),
+                      Text(
+                        'No picklists found for ${controller.selectedStatusFilter.value == 'R' ? 'Released' : 'Closed'} status.',
+                        style: TextStyle(color: Colors.grey[600], fontSize: 18),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
                 ),
+              )
+            else
+              // ... kode sebelum ListView tetap tidak diubah
+
+Expanded(
+  child: ListView.separated(
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    controller: controller.scrollController,
+    itemCount: MediaQuery.of(context).size.width > 800
+        ? controller.displayedPicklists.length + 1 // <— tambahkan header
+        : controller.displayedPicklists.length,
+    separatorBuilder: (_, __) => const SizedBox(height: 12),
+    itemBuilder: (context, index) {
+      final screenWidth = MediaQuery.of(context).size.width;
+      final isWeb = screenWidth > 800;
+
+      if (isWeb) {
+        if (index == 0) {
+          // ===== HEADER BARIS =====
+          return Container(
+            padding:
+                const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+            margin: const EdgeInsets.symmetric(horizontal: 4),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.grey.shade300),
+            ),
+            child: Row(
+              children: const [
+                Expanded(
+                  flex: 2,
+                  child: Text('Name',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+                Expanded(
+                  flex: 1,
+                  child: Text('Total Items',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: Text('Pick Date',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+                Expanded(
+                  flex: 3,
+                  child: Text('Remarks',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+                Expanded(
+                  flex: 1,
+                  child: Text('Status',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+                SizedBox(width: 30),
               ],
             ),
           );
         }
 
-        return Column(
-          children: [
-            // Card summary total released & closed
-            // Padding(
-            //   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            //   child: Row(
-            //     children: [
-            //       Expanded(
-            //         child: GestureDetector(
-            //           onTap: () {
-            //             controller.changeStatusFilter('R');
+        // ===== ROW DATA ACTUAL =====
+        final actualIndex = index - 1; // <— penting
+        final picklist = controller.displayedPicklists[actualIndex];
+        final bool isViewOnly = picklist['Status'] == 'Y';
 
-            //           },
-            //           child: AnimatedStatusSummaryCard(
-            //             status: 'Released',
-            //             total: totalReleased,
-            //             startColor: Colors.blue.shade600,
-            //             endColor: Colors.blue.shade400,
-            //             icon: Icons.check_circle_outline,
-            //           ),
-            //         ),
-            //       ),
-            //       const SizedBox(width: 12),
-            //       Expanded(
-            //         child: GestureDetector(
-            //           onTap: () {
-            //              controller.changeStatusFilter('C');
-
-            //           },
-            //           child: AnimatedStatusSummaryCard(
-            //             status: 'Closed',
-            //             total: totalClosed,
-            //             startColor: Colors.red.shade600,
-            //             endColor: Colors.red.shade400,
-            //             icon: Icons.lock_outline,
-            //           ),
-            //         ),
-            //       ),
-            //     ],
-            //   ),
-            // ),
-            Expanded(
-              child: ListView.separated(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-                itemCount: controller.displayedPicklists.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 12),
-                itemBuilder: (context, index) {
-                  final picklist = controller.displayedPicklists[index];
-                  final bool isViewOnly = picklist['Status'] == 'C';
-
-                  return Card(
-                    color: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: BorderSide(
-                        color:
-                            isViewOnly
-                                ? colorScheme.error
-                                : colorScheme.primary,
-                        width: 1.2,
-                      ),
+        return MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: InkWell(
+            onTap: () {
+              controller.currentProcessingPicklist.value =
+                  Map<String, dynamic>.from(picklist);
+              Get.to(() =>
+                  PicklistDetailPage(isViewOnly: isViewOnly));
+            },
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+              margin: const EdgeInsets.symmetric(horizontal: 4),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.08),
+                    blurRadius: 4,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
+                border: Border.all(color: Colors.grey.shade300),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: Text(
+                      picklist['Name'] ?? 'No Name',
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                          color: Colors.black87),
                     ),
-                    elevation: 0,
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(12),
-                      onTap: () {
-                        controller
-                            .currentProcessingPicklist
-                            .value = Map<String, dynamic>.from(picklist);
-                        Get.to(
-                          () => PicklistDetailPage(isViewOnly: isViewOnly),
-                        );
-                      },
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 16,
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              isViewOnly
-                                  ? Icons.lock_outline
-                                  : Icons.playlist_add_check,
-                              color:
-                                  isViewOnly
-                                      ? colorScheme.error
-                                      : colorScheme.primary,
-                              size: 30,
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    picklist['Name'] ?? 'No Name',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 18,
-                                      color: colorScheme.onSurface,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  // Text(
-                                  //   'ID: ${picklist['Absoluteentry']} - Items: ${(picklist['DocumentLine'] as List).length}',
-                                  //   style: TextStyle(
-                                  //     color: Colors.grey[700],
-                                  //     fontSize: 14,
-                                  //   ),
-                                  // ),
-                                  Text(
-                                    'Total Items: ${(picklist['DocumentLine'] as List).length}',
-                                    style: TextStyle(
-                                      color: Colors.grey[700],
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'Pick Date: ${_formatPickDate(picklist['PickDate'])}',
-                                    style: TextStyle(
-                                      color: Colors.grey[700],
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'Remarks: ${picklist['Remarks'] ?? '-'}',
-                                    style: TextStyle(
-                                      color: Colors.grey[700],
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-
-                            StatusBadge(
-                              text: isViewOnly ? 'Closed' : 'Released',
-                              backgroundColor:
-                                  isViewOnly
-                                      ? Colors.red.shade100
-                                      : Colors.blue.shade100,
-                              textColor:
-                                  isViewOnly
-                                      ? Colors.red.shade600
-                                      : Colors.blue.shade600,
-                              icon:
-                                  isViewOnly
-                                      ? Icons.lock_outline
-                                      : Icons.check_circle_outline,
-                            ),
-                            Icon(
-                              Icons.arrow_forward_ios,
-                              size: 18,
-                              color: colorScheme.onSurface.withOpacity(0.5),
-                            ),
-                          ],
-                        ),
-                      ),
+                  ),
+                  Expanded(
+                    flex: 1,
+                    child: Text(
+                      '${(picklist['DocumentLine'] as List).length}',
+                      style: const TextStyle(
+                          fontSize: 13, color: Colors.black87),
+                      textAlign: TextAlign.center,
                     ),
-                  );
-                },
+                  ),
+                  Expanded(
+                    flex: 2,
+                    child: Text(
+                      format.formatPickDate(picklist['PickDate']),
+                      style: const TextStyle(
+                          fontSize: 13, color: Colors.black87),
+                    ),
+                  ),
+                  Expanded(
+                    flex: 3,
+                    child: Text(
+                      picklist['Remarks'] ?? '-',
+                      style: const TextStyle(
+                          fontSize: 13, color: Colors.black54),
+                    ),
+                  ),
+                  Expanded(
+                    flex: 1,
+                    child: StatusBadge(
+                      text: isViewOnly ? 'Closed' : 'Released',
+                      backgroundColor: isViewOnly
+                          ? Colors.red.shade100
+                          : Colors.blue.shade100,
+                      textColor: isViewOnly
+                          ? Colors.red.shade600
+                          : Colors.blue.shade600,
+                      icon: isViewOnly
+                          ? Icons.lock_outline
+                          : Icons.check_circle_outline,
+                    ),
+                  ),
+                  const Icon(
+                    Icons.arrow_forward_ios,
+                    size: 16,
+                    color: Colors.grey,
+                  ),
+                ],
               ),
             ),
+          ),
+        );
+      }
+
+      // ===== MOBILE VIEW (tetap seperti sebelumnya) =====
+      final picklist = controller.displayedPicklists[index];
+      final bool isViewOnly = picklist['Status'] == 'Y';
+
+      return Card(
+        color: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(
+              color: isViewOnly
+                  ? colorScheme.error
+                  : colorScheme.primary,
+              width: 1.2),
+        ),
+        elevation: 0,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () {
+            controller.currentProcessingPicklist.value =
+                Map<String, dynamic>.from(picklist);
+            Get.to(() => PicklistDetailPage(isViewOnly: isViewOnly));
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+                horizontal: 20, vertical: 16),
+            child: Row(
+              children: [
+                Icon(
+                  isViewOnly ? Icons.lock_outline : Icons.playlist_add_check,
+                  color: isViewOnly
+                      ? colorScheme.error
+                      : colorScheme.primary,
+                  size: 30,
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        picklist['Name'] ?? 'No Name',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 18,
+                          color: colorScheme.onSurface,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Total Items: ${(picklist['DocumentLine'] as List).length}',
+                        style: TextStyle(
+                          color: Colors.grey[700],
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Pick Date: ${format.formatPickDate(picklist['PickDate'])}',
+                        style: TextStyle(
+                          color: Colors.grey[700],
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Remarks: ${picklist['Remarks'] ?? '-'}',
+                        style: TextStyle(
+                          color: Colors.grey[700],
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                StatusBadge(
+                  text: isViewOnly ? 'Closed' : 'Released',
+                  backgroundColor: isViewOnly
+                      ? Colors.red.shade100
+                      : Colors.blue.shade100,
+                  textColor: isViewOnly
+                      ? Colors.red.shade600
+                      : Colors.blue.shade600,
+                  icon: isViewOnly
+                      ? Icons.lock_outline
+                      : Icons.check_circle_outline,
+                ),
+                Icon(
+                  Icons.arrow_forward_ios,
+                  size: 18,
+                  color: colorScheme.onSurface.withOpacity(0.5),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    },
+  ),
+),
+
           ],
         );
       }),
@@ -356,6 +579,112 @@ class PicklistsPage extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  void showWarehouseFilterMenu(BuildContext context, Offset offset) {
+    final itemController = ItemController();
+    itemController.filteredWarehouseList.assignAll(
+      itemController.selectedWarehouses,
+    );
+
+    final controller = PicklistController();
+    showDialog(
+      context: context,
+      barrierColor: Colors.white,
+      builder: (context) {
+        return Stack(
+          children: [
+            Positioned(
+              left: offset.dx,
+              top: offset.dy,
+              child: Material(
+                elevation: 4,
+                borderRadius: BorderRadius.circular(12),
+                color: Colors.white,
+                child: Container(
+                  width: 250,
+                  padding: const EdgeInsets.all(8),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextField(
+                        decoration: InputDecoration(
+                          hintText: 'Cari warehouse...',
+                          prefixIcon: const Icon(Icons.search),
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        onChanged:
+                            (value) => controller.fetchPickList(
+                              reset: true,
+                              source: controller.searchQuery.value,
+                              warehouse: value,
+                            ),
+                        // itemController.filterWarehouseSearch(value),
+                      ),
+                      const SizedBox(height: 8),
+                      Obx(
+                        () => Container(
+                          color: Colors.white,
+                          constraints: const BoxConstraints(maxHeight: 380),
+                          child: ListView.builder(
+                            itemCount:
+                                itemController.filteredWarehouseList.length,
+                            itemBuilder: (_, index) {
+                              final w =
+                                  itemController.filteredWarehouseList[index];
+                              return InkWell(
+                                onTap: () {
+                                  itemController.selectedWarehouseFilter.value =
+                                      w;
+                                  controller.fetchPickList(
+                                    reset: true,
+                                    source: controller.searchQuery.value,
+                                    warehouse: w,
+                                  );
+                                  // print (w);
+                                  //    controller.fetchPickableItems(reset: true,source:controller.searchQuery.value, warehouse:w);
+                                  Navigator.pop(context);
+                                },
+
+                                hoverColor: Colors.blue.withOpacity(0.1),
+                                child: Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 10,
+                                  ),
+                                  decoration: const BoxDecoration(
+                                    color: Colors.white,
+                                  ),
+                                  child: Text(
+                                    w,
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.black,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

@@ -5,44 +5,59 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:http/http.dart' as http;
-import 'package:wms/models/warehouse_model.dart';
 
+import '../helper/encrypt.dart';
 import '../helper/endpoint.dart';
+import 'api_service.dart';
 
 class SAPService extends GetConnect {
   // Ganti dengan base URL API SAP B1 Anda
   final String _baseUrl = apiB1;
+  final ApiService _apiservice = ApiService();
   final box = GetStorage();
   @override
   void onInit() {
     httpClient.baseUrl = _baseUrl;
   }
 
-  Future<bool> LoginSAP() async {
-    if (box.read('sap_username')==null)
-    {
-        Get.snackbar("Error", "SAP Login failed: sap username is required");
+  Future<bool> LoginSAP({
+    String sap_db = '',
+    String sap_username = '',
+    String sap_pass = '',
+  }) async {
+    if (box.read('sap_username') == null) {
+      Get.snackbar("Error", "SAP Login failed: sap username is required");
       return false;
     }
-    if (box.read('sap_password')==null)
-    {
-        Get.snackbar("Error", "SAP Login failed: sap password is required");
+    if (box.read('sap_password') == null) {
+      Get.snackbar("Error", "SAP Login failed: sap password is required");
       return false;
     }
-    if (box.read('sap_db_name')==null)
-    {
-        Get.snackbar("Error", "SAP Login failed: sap db name is required");
+    if (box.read('sap_db_name') == null) {
+      Get.snackbar("Error", "SAP Login failed: sap db name is required");
       return false;
     }
+
+    String body = '';
+    if (sap_db == '') {
+      body = jsonEncode({
+        'UserName': box.read('sap_username'),
+        'Password': box.read('sap_password'),
+        'CompanyDB': box.read('sap_db_name'), // Ganti sesuai database SAP kamu
+      });
+    } else {
+      body = jsonEncode({
+        'UserName': sap_username,
+        'Password': AESHelper.decryptData(sap_pass),
+        'CompanyDB': sap_db, // Ganti sesuai database SAP kamu
+      });
+    }
+
     final sap_url = Uri.parse(apiLogin);
     final sap_response = await http.post(
       sap_url,
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'UserName': box.read('sap_username'),
-        'Password': box.read('sap_password'),
-        'CompanyDB': box.read('sap_db_name'), // Ganti sesuai database SAP kamu
-      }),
+      body: body,
     );
 
     if (sap_response.statusCode == 200) {
@@ -50,7 +65,7 @@ class SAPService extends GetConnect {
       await box.write('sessionId', data['SessionId']);
       return true;
     } else {
-    //  Get.snackbar("Error", "SAP Login failed: ${sap_response.statusCode}");
+      //  Get.snackbar("Error", "SAP Login failed: ${sap_response.statusCode}");
       return false;
     }
   }
@@ -84,16 +99,10 @@ class SAPService extends GetConnect {
         if (exactMatch != null) {
           return exactMatch["ItemName"]?.toString();
         } else {
-          // Get.snackbar(
-          //   'Not Found',
-          //   'Item dengan kode "$itemCode" tidak ditemukan.',
-          //   snackPosition: SnackPosition.TOP,
-          //   backgroundColor: Colors.orangeAccent,
-          // colorText: Colors.white,
-          // );
           return "";
         }
       } else if (res.statusCode == 401 ||
+          res.statusCode == 301 ||
           res.body.contains('Session expired')) {
         Get.snackbar(
           "Session Expired",
@@ -143,6 +152,7 @@ class SAPService extends GetConnect {
         final List<dynamic> newItemsRaw = data['value'] ?? [];
         return newItemsRaw;
       } else if (res.statusCode == 401 ||
+          res.statusCode == 301 ||
           res.body.contains('Session expired')) {
         final loginSuccess = await LoginSAP();
         if (loginSuccess) {
@@ -184,7 +194,8 @@ class SAPService extends GetConnect {
       return [];
     }
   }
-Future<List<dynamic>> getItemHeader(String itemCode) async {
+
+  Future<List<dynamic>> getItemHeader(String itemCode) async {
     try {
       final session = box.read('sessionId') ?? '';
       final url = Uri.parse('$apiItemHeader?filter=$itemCode');
@@ -204,9 +215,10 @@ Future<List<dynamic>> getItemHeader(String itemCode) async {
         final List<dynamic> newItemsRaw = data['value'] ?? [];
         return newItemsRaw;
       } else if (res.statusCode == 401 ||
+          res.statusCode == 301 ||
           res.body.contains('Session expired')) {
         final loginSuccess = await LoginSAP();
-        if (loginSuccess) { 
+        if (loginSuccess) {
           return await getItemHeader(itemCode);
         } else {
           // Gagal login ulang
@@ -218,7 +230,7 @@ Future<List<dynamic>> getItemHeader(String itemCode) async {
           box.erase();
           Get.offAllNamed('/login');
           return [];
-        } 
+        }
       } else {
         Get.snackbar(
           "Error",
@@ -236,6 +248,7 @@ Future<List<dynamic>> getItemHeader(String itemCode) async {
       return [];
     }
   }
+
   // --- API untuk PO (Purchase Order) ---
   Future<Map<String, dynamic>?> fetchPoDetails(String poNumber) async {
     try {
@@ -268,6 +281,7 @@ Future<List<dynamic>> getItemHeader(String itemCode) async {
           return null;
         }
       } else if (response.statusCode == 401 ||
+          response.statusCode == 301 ||
           response.body.contains('Session expired')) {
         final loginSuccess = await LoginSAP();
         if (loginSuccess) {
@@ -309,17 +323,19 @@ Future<List<dynamic>> getItemHeader(String itemCode) async {
     try {
       final url = Uri.parse('$apiB1?path=PurchaseDeliveryNotes');
       final session = box.read('sessionId') ?? '';
-
+      final wms_user = box.read('username') ?? '';
       final body = json.encode(goodsReceiptData);
 
       final response = await http.post(
         url,
-        headers: {'session': session, 'Content-Type': 'application/json'},
+        headers: {'session': session,'wms_user': wms_user, 'Content-Type': 'application/json'},
         body: body,
       );
       if (response.statusCode == 200 || response.statusCode == 201) {
+         await LoginSAP();
         return true;
       } else if (response.statusCode == 401 ||
+          response.statusCode == 301 ||
           response.body.contains('Session expired')) {
         final loginSuccess = await LoginSAP();
         if (loginSuccess) {
@@ -357,6 +373,12 @@ Future<List<dynamic>> getItemHeader(String itemCode) async {
         snackPosition: SnackPosition.TOP,
       );
       return false;
+    } finally {
+      // final loginSuccess = await LoginSAP(
+      //   sap_db: box.read('sap_db_name'),
+      //   sap_username: box.read('sap_username'),
+      //   sap_pass: box.read('sap_password'),
+      // );
     }
   }
 
@@ -384,6 +406,7 @@ Future<List<dynamic>> getItemHeader(String itemCode) async {
 
         return data['value'] ?? [];
       } else if (res.statusCode == 401 ||
+          res.statusCode == 301 ||
           res.body.contains('Session expired')) {
         final loginSuccess = await LoginSAP();
         if (loginSuccess) {
@@ -425,18 +448,19 @@ Future<List<dynamic>> getItemHeader(String itemCode) async {
     try {
       final url = Uri.parse('$apiB1?path=InventoryGenEntries');
       final session = box.read('sessionId') ?? '';
-
+    final wms_user = box.read('username') ?? '';
       final body = json.encode(goodsReceiptData);
 
       final response = await http.post(
         url,
-        headers: {'session': session, 'Content-Type': 'application/json'},
+        headers: {'session': session,'wms_user':wms_user, 'Content-Type': 'application/json'},
         body: body,
-      );
-
+      ); 
       if (response.statusCode == 200 || response.statusCode == 201) {
+           await LoginSAP(); 
         return true;
       } else if (response.statusCode == 401 ||
+          response.statusCode == 301 ||
           response.body.contains('Session expired')) {
         final loginSuccess = await LoginSAP();
         if (loginSuccess) {
@@ -471,7 +495,7 @@ Future<List<dynamic>> getItemHeader(String itemCode) async {
         snackPosition: SnackPosition.TOP,
       );
       return false;
-    }
+    } 
   }
 
   // Mengembalikan List<Map<String, dynamic>>
@@ -479,23 +503,30 @@ Future<List<dynamic>> getItemHeader(String itemCode) async {
     int skip,
     String? source,
     String? str,
+    String? warehouse,
   ) async {
     try {
+      print('str : $str');
+     
+       print('skip : $skip' ); 
       final url = Uri.parse(apiPickPack);
       final session = box.read('sessionId') ?? '';
-      final warehouse = box.read('warehouse_code') ?? '';
-      var mSource = "";
-      if (source == "ALL") {
-        mSource = "";
-      } else {
-        mSource = source.toString().toLowerCase();
+      if (warehouse == "") {
+        warehouse = box.read('warehouse_code') ?? '';
       }
+      // print ('warehouse hit : $warehouse');
+      var mSource = "";
+     if ((source ?? '').toUpperCase() != 'ALL') {
+  mSource = source?.toLowerCase() ?? "";
+}
+ mSource ??= "";
+      print('source : $mSource' );
       final response = await http.get(
         url,
         headers: {
           'session': session,
           'Accept': 'application/json',
-          'warehouse': warehouse,
+          'warehouse': warehouse.toString(),
           'source': mSource,
           'skip': skip.toString(),
           'str': str.toString(),
@@ -508,6 +539,7 @@ Future<List<dynamic>> getItemHeader(String itemCode) async {
         // final List<dynamic> data = json.decode(response.body)['value'];
         // return data.cast<Map<String, dynamic>>(); // Cast langsung ke Map
       } else if (response.statusCode == 401 ||
+          response.statusCode == 301 ||
           response.body.contains('Session expired')) {
         final sapLoginSuccess = await LoginSAP(); // Coba login SAP
         if (!sapLoginSuccess) {
@@ -530,18 +562,98 @@ Future<List<dynamic>> getItemHeader(String itemCode) async {
           Get.offAllNamed('/login');
           return [];
         } else {
-          getPickPack(skip, source, str);
+          getPickPack(skip, source, str, warehouse);
           return [];
         }
+      } else if (response.body.contains('Request timed out')) {
+        getPickPack(skip, source, str, warehouse);
+        return [];
       } else {
-        throw Exception('Failed to load Sales Orders: ${response.body}');
+        throw Exception('Failed to load pick pack managert: ${response.body}');
       }
     } catch (e) {
-      print('Error getting Sales Orders: $e');
+      print('Error getting pick pack managert: $e');
       return [];
     }
   }
- 
+
+  Future<List<Map<String, dynamic>>> getScanPickPack(
+    int skip,
+    String? source,
+    String? str,
+    String? warehouse,
+  ) async {
+    try {
+      print('str : $str');
+      final url = Uri.parse(apiScanPickPack);
+      final session = box.read('sessionId') ?? '';
+      if (warehouse == "") {
+        warehouse = box.read('warehouse_code') ?? '';
+      }
+      // print ('warehouse hit : $warehouse');
+      var mSource = "";
+      if (source == "ALL") {
+        mSource = "";
+      } else {
+        mSource = source.toString().toLowerCase();
+      }
+     
+      final response = await http.get(
+        url,
+        headers: {
+          'session': session,
+          'Accept': 'application/json',
+          'warehouse': warehouse.toString(),
+          'source': mSource,
+          'skip': skip.toString(),
+          'str': str.toString(),
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        return data.cast<Map<String, dynamic>>(); // List of documents
+        // final List<dynamic> data = json.decode(response.body)['value'];
+        // return data.cast<Map<String, dynamic>>(); // Cast langsung ke Map
+      } else if (response.statusCode == 401 ||
+          response.statusCode == 301 ||
+          response.body.contains('Session expired')) {
+        final sapLoginSuccess = await LoginSAP(); // Coba login SAP
+        if (!sapLoginSuccess) {
+          Get.snackbar(
+            "SAP Login",
+            "Failed login to SAP. Some features may be limited.",
+            snackPosition: SnackPosition.TOP,
+            snackStyle: SnackStyle.FLOATING,
+            backgroundColor: Colors.orangeAccent,
+            colorText: Colors.blueGrey,
+          );
+          Get.snackbar(
+            "Session Expired",
+            "Silakan login kembali.",
+            snackPosition: SnackPosition.TOP,
+            backgroundColor: Colors.redAccent,
+            colorText: Colors.white,
+          );
+          box.erase();
+          Get.offAllNamed('/login');
+          return [];
+        } else {
+          getPickPack(skip, source, str, warehouse);
+          return [];
+        }
+      } else if (response.body.contains('Request timed out')) {
+        getPickPack(skip, source, str, warehouse);
+        return [];
+      } else {
+        throw Exception('Failed to load pick pack manager: ${response.body}');
+      }
+    } catch (e) {
+      print('Error getting pick pack manager: $e');
+      return [];
+    }
+  }
+
   // Mengembalikan Map<String, dynamic>?
   Future<Map<String, dynamic>?> getItemWarehouseInfo(
     String itemCode,
@@ -573,15 +685,44 @@ Future<List<dynamic>> getItemHeader(String itemCode) async {
   }
 
   // Menerima Map<String, dynamic> dan mengembalikan Map<String, dynamic>?
-  Future<String> createPickList(Map<String, dynamic> pickListData) async {
+  Future<String> createPickList(
+    Map<String, dynamic> pickListData,
+    String warehouseCode,
+  ) async {
     try {
+      if (warehouseCode != box.read('warehouse_code')) {
+        final warehouse_code = {'warehouse_code': warehouseCode};
+        print(warehouseCode);
+         print(warehouse_code);
+        final data = await _apiservice.getWarehouseAuth(warehouse_code);
+        final sapDb = data?['sap_db_name'] ?? box.read('sap_db_name');
+        final sapUser = data?['sap_username'] ?? '';
+        final sapPass = data?['sap_password'] ?? '';
+
+        final loginSuccess = await LoginSAP(
+          sap_db: sapDb,
+          sap_username: sapUser,
+          sap_pass: sapPass,
+        );
+        if (!loginSuccess) {
+          Get.snackbar(
+            "Session Expired",
+            "Gagal login ulang. Silakan login manual.",
+            snackPosition: SnackPosition.TOP,
+          );
+          box.erase();
+          Get.offAllNamed('/login');
+          return "Session Expired";
+        }
+      }
+
       final url = Uri.parse('$apiB1?path=PickLists');
       final session = box.read('sessionId') ?? '';
       final body = json.encode(pickListData);
-
+   final wms_user = box.read('username') ?? '';
       final response = await http.post(
         url,
-        headers: {'session': session, 'Content-Type': 'application/json'},
+        headers: {'session': session,'wms_user':wms_user, 'Content-Type': 'application/json'},
         body: body,
       );
 
@@ -589,10 +730,11 @@ Future<List<dynamic>> getItemHeader(String itemCode) async {
       if (response.statusCode == 200 || response.statusCode == 201) {
         return '';
       } else if (response.statusCode == 401 ||
+          response.statusCode == 301 ||
           response.body.contains('Session expired')) {
         final loginSuccess = await LoginSAP();
         if (loginSuccess) {
-          return await createPickList(pickListData);
+          return await createPickList(pickListData, warehouseCode);
         } else {
           // Gagal login ulang
           Get.snackbar(
@@ -608,12 +750,6 @@ Future<List<dynamic>> getItemHeader(String itemCode) async {
         final error = json.decode(response.body);
         final errorMessage =
             error["error"]?["message"]?["value"] ?? "Unknown Error";
-
-        // Get.snackbar(
-        //   'Error',
-        //   'Failed to generate picklist: $errorMessage',
-        //   snackPosition: SnackPosition.TOP,
-        // );
         return errorMessage;
       }
     } catch (e) {
@@ -622,39 +758,47 @@ Future<List<dynamic>> getItemHeader(String itemCode) async {
     }
   }
 
-
-   Future<List<Map<String, dynamic>>> getPickList(
+  Future<List<Map<String, dynamic>>> getPickList(
     int skip,
     String? source,
     String? str,
+    String? warehouse,
   ) async {
     try {
       final url = Uri.parse(apiPickList);
       final session = box.read('sessionId') ?? '';
-      final warehouse = box.read('warehouse_code') ?? '';
+       final wms_user = box.read('username') ?? '';
+      if (warehouse == "") {
+        warehouse = box.read('warehouse_code') ?? '';
+      }
+      // print(warehouse);
       var mSource = "";
-      if (source == "ALL") {
+      if (source.toString().toLowerCase() == "r") {
         mSource = "";
       } else {
         mSource = source.toString().toLowerCase();
       }
+  mSource ??= "";
+       print('source picklist: $mSource');
       final response = await http.get(
         url,
         headers: {
           'session': session,
           'Accept': 'application/json',
-          'warehouse': warehouse,
+          'warehouse': warehouse.toString(),
           'source': mSource,
           'skip': skip.toString(),
           'str': str.toString(),
+          'wms_user' : wms_user,
         },
       );
 
       if (response.statusCode == 200) {
-       // var a = json.decode(response.body);
+        // var a = json.decode(response.body);
         final List<dynamic> data = json.decode(response.body);
-        return data.cast<Map<String, dynamic>>(); // List of documents 
+        return data.cast<Map<String, dynamic>>(); // List of documents
       } else if (response.statusCode == 401 ||
+          response.statusCode == 301 ||
           response.body.contains('Session expired')) {
         final sapLoginSuccess = await LoginSAP(); // Coba login SAP
         if (!sapLoginSuccess) {
@@ -677,17 +821,215 @@ Future<List<dynamic>> getItemHeader(String itemCode) async {
           Get.offAllNamed('/login');
           return [];
         } else {
-          getPickPack(skip, source, str);
+          getPickList(skip, mSource, str, warehouse);
           return [];
         }
+      } else if (response.body.contains('Request timed out')) {
+        getPickList(skip, mSource, str, warehouse);
+        return [];
       } else {
-        throw Exception('Failed to load Sales Orders: ${response.body}');
+        throw Exception('Failed to load pick list: ${response.body}');
       }
     } catch (e) {
-      print('Error getting Sales Orders: $e');
+      print('Error getting pick list: $e');
       return [];
     }
   }
+
+  Future<String> updatePickList(
+    Map<String, dynamic> pickListData,
+    int id,
+    String warehouseCode,
+  ) async {
+    try {
+      if (warehouseCode != box.read('warehouse_code')) {
+        final warehouse_code = {'warehouse_code': warehouseCode};
+
+        final data = await _apiservice.getWarehouseAuth(warehouse_code);
+         
+        final sapDb = data?['sap_db_name'] ?? box.read('sap_db_name');
+        final sapUser = data?['sap_username'] ?? '';
+        final sapPass = data?['sap_password'] ?? '';
+
+        final loginSuccess = await LoginSAP(
+          sap_db: sapDb,
+          sap_username: sapUser,
+          sap_pass: sapPass,
+        );
+        if (!loginSuccess) {
+          Get.snackbar(
+            "Session Expired",
+            "Gagal login ulang. Silakan login manual.",
+            snackPosition: SnackPosition.TOP,
+          );
+          box.erase();
+          Get.offAllNamed('/login');
+          return "Session Expired";
+        }
+      }
+
+      final url = Uri.parse('$apiB1?path=PickLists($id)');
+      final session = box.read('sessionId') ?? '';
+      final wms_user = box.read('username') ?? '';
+      final body = json.encode(pickListData);
+      
+      final response = await http.patch(
+        url,
+        headers: {'session': session,'wms_user':wms_user, 'Content-Type': 'application/json'},
+        body: body,
+      );
+     
+      //final response = await _apiService.post('PickLists', pickListData);
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return '';
+      } else if (response.statusCode == 401 ||
+          response.statusCode == 301 ||
+          response.body.contains('Session expired')) {
+        final loginSuccess = await LoginSAP();
+        if (loginSuccess) {
+          return await createPickList(pickListData, warehouseCode);
+        } else {
+          // Gagal login ulang
+          Get.snackbar(
+            "Session Expired",
+            "Gagal login ulang. Silakan login manual.",
+            snackPosition: SnackPosition.TOP,
+          );
+          box.erase();
+          Get.offAllNamed('/login');
+          return "Session Expired";
+        }
+      } else {
+        final error = json.decode(response.body);
+        final errorMessage =
+            error["error"]?["message"]?["value"] ?? "Unknown Error";
+        return errorMessage;
+      }
+    } catch (e) {
+      print('Error creating Pick List: $e');
+      return 'Error creating Pick List: $e';
+    }
+  }
  
-  
+Future<List<Map<String, dynamic>>> getInventoryInList(
+    int skip,
+    String? source,
+    String? str,
+    String? warehouse,String? status
+  ) async {
+    try {
+      final url = Uri.parse(apiInventoryIn);
+      final session = box.read('sessionId') ?? '';
+      if (warehouse == "") {
+        warehouse = box.read('warehouse_code') ?? '';
+      }
+      // print(warehouse);
+      var mSource = "";
+      if (source == "ALL") {
+        mSource = "";
+      } else {
+        mSource = source.toString().toLowerCase();
+      } 
+
+      final response = await http.get(
+        url,
+        headers: {
+          'session': session,
+          'Accept': 'application/json',
+          'warehouse': warehouse.toString(),
+          'source': mSource,
+          'skip': skip.toString(),
+          'str': str.toString(),
+          'docStat': status.toString().toLowerCase(),
+        },
+      );
+
+      if (response.statusCode == 200) {
+        // var a = json.decode(response.body);
+        final List<dynamic> data = json.decode(response.body);
+        return data.cast<Map<String, dynamic>>(); // List of documents
+      } else if (response.statusCode == 401 ||
+          response.statusCode == 301 ||
+          response.body.contains('Session expired')) {
+        final sapLoginSuccess = await LoginSAP(); // Coba login SAP
+        if (!sapLoginSuccess) {
+          Get.snackbar(
+            "SAP Login",
+            "Failed login to SAP. Some features may be limited.",
+            snackPosition: SnackPosition.TOP,
+            snackStyle: SnackStyle.FLOATING,
+            backgroundColor: Colors.orangeAccent,
+            colorText: Colors.blueGrey,
+          );
+          Get.snackbar(
+            "Session Expired",
+            "Silakan login kembali.",
+            snackPosition: SnackPosition.TOP,
+            backgroundColor: Colors.redAccent,
+            colorText: Colors.white,
+          );
+          box.erase();
+          Get.offAllNamed('/login');
+          return [];
+        } else {
+          getInventoryInList(skip, source, str, warehouse,status.toString().toLowerCase());
+          return [];
+        }
+      } else if (response.body.contains('Request timed out')) {
+        getInventoryInList(skip, source, str, warehouse,status.toString().toLowerCase());
+        return [];
+      } else {
+        throw Exception('Failed to load list inventory: ${response.body}');
+      }
+    } catch (e) {
+      print('Error getting list inventory: $e');
+      return [];
+    }
+  }
+
+  Future<bool> editInventoryIn(
+   
+    String source,
+    int docEntry,
+    Map<String, dynamic> data,
+  ) async {
+    // PATCH /InventoryGenEntries(<DocEntry>) atau PurchaseDeliveryNotes
+    
+    final url = Uri.parse('$baseUrl/$source($docEntry)');
+    final resp = await http.patch(
+      url,
+      headers: {
+        'session': '',
+        'Content-Type': 'application/json'
+      },
+      body: json.encode(data),
+    );
+    return resp.statusCode == 204; // SAP return 204 No Content on success
+  }
+
+  Future<bool> cancelInventoryIn(
+      String source, int docEntry) async {
+    // POST /InventoryGenEntries(<DocEntry>)/Cancel
+    var endpoint="";
+    if(source=="po")
+    {
+      endpoint="PurchaseDeliveryNotes";
+    }
+    else
+    {
+      endpoint="InventoryGenEntries";
+    }
+     final session = box.read('sessionId') ?? '';
+    final url = Uri.parse('$apiB1?path=$endpoint($docEntry)/Cancel');
+    final resp = await http.post(
+      url,
+      headers: {
+        'session': session,
+        'Content-Type': 'application/json' 
+      },
+      body:'{}',
+    );
+    
+    return true;
+  }
 }

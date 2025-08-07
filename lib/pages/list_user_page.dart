@@ -3,6 +3,8 @@ import 'package:get/get.dart';
 import '../controllers/list_user_controller.dart';
 import 'user_manage_page.dart';
 import 'user_grant_page.dart';
+import 'user_setting_warehouse.dart';
+
 class ListUserPage extends StatelessWidget {
   final ListUserController userController = Get.put(ListUserController());
   final TextEditingController searchController = TextEditingController();
@@ -31,7 +33,10 @@ class ListUserPage extends StatelessWidget {
                 prefixIcon: const Icon(Icons.search),
                 filled: true,
                 fillColor: Colors.white,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 0,
+                ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
@@ -46,24 +51,42 @@ class ListUserPage extends StatelessWidget {
                 return const Center(child: CircularProgressIndicator());
               }
 
-              final filteredUsers = userController.users.where((user) {
-                final keyword = searchKeyword.value;
-                final nama = (user['nama'] ?? '').toString().toLowerCase();
-                final username = (user['username'] ?? '').toString().toLowerCase();
-                final atasan = (user['atasan'] ?? '').toString().toLowerCase();
-                final warehouse = (user['WarehouseName'] ?? '').toString().toLowerCase();
-
-                return nama.contains(keyword) ||
-                    username.contains(keyword) ||
-                    atasan.contains(keyword) ||
-                    warehouse.contains(keyword);
-              }).toList();
-
+              // ✨ filter + konversi ke List<Map<String,dynamic>>
+              final filteredUsers =
+                  userController.users
+                      .where((user) {
+                        final keyword = searchKeyword.value;
+                        final nama =
+                            (user['nama'] ?? '').toString().toLowerCase();
+                        final username =
+                            (user['username'] ?? '').toString().toLowerCase();
+                        final atasan =
+                            (user['atasan'] ?? '').toString().toLowerCase();
+                        final warehouse =
+                            (user['WarehouseName'] ?? '')
+                                .toString()
+                                .toLowerCase();
+                        return nama.contains(keyword) ||
+                            username.contains(keyword) ||
+                            atasan.contains(keyword) ||
+                            warehouse.contains(keyword);
+                      })
+                      .map((e) => Map<String, dynamic>.from(e))
+                      .toList();
 
               if (filteredUsers.isEmpty) {
                 return const Center(child: Text('No users found'));
               }
 
+              final screenWidth = MediaQuery.of(context).size.width;
+              final isWeb = screenWidth >= 800;
+
+              // 🌐 ➝ TABLE (web)
+              if (isWeb) {
+                return buildUserTable(filteredUsers);
+              }
+
+              // 📱 ➝ LIST CARD (mobile)
               return ListView.builder(
                 padding: const EdgeInsets.all(12),
                 itemCount: filteredUsers.length,
@@ -74,7 +97,9 @@ class ListUserPage extends StatelessWidget {
                       showModalBottomSheet(
                         context: context,
                         shape: const RoundedRectangleBorder(
-                          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                          borderRadius: BorderRadius.vertical(
+                            top: Radius.circular(16),
+                          ),
                         ),
                         builder: (_) => _buildUserActionSheet(context, user),
                       );
@@ -99,6 +124,49 @@ class ListUserPage extends StatelessWidget {
       backgroundColor: Colors.grey[100],
     );
   }
+
+ Widget buildUserTable(List<Map<String, dynamic>> users) {
+  return Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(16),
+    child: DataTable(
+      showCheckboxColumn: false, // << biar gak muncul checkbox
+      columnSpacing: 36,
+      headingRowColor:
+          MaterialStateColor.resolveWith((states) => Colors.blue.shade50),
+      columns: const [
+        DataColumn(label: Text('Nama')),
+        DataColumn(label: Text('Username')),
+        DataColumn(label: Text('Warehouse')),
+        DataColumn(label: Text('Leader')),
+        DataColumn(label: Text('')),
+      ],
+      rows: users.map((user) {
+        return DataRow(
+          onSelectChanged: (selected) {
+            showModalBottomSheet(
+              context: Get.context!,
+              shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+              ),
+              builder: (_) => _buildUserActionSheet(Get.context!, user),
+            );
+          },
+          cells: [
+            DataCell(Text(user['nama'] ?? '-')),
+            DataCell(Text(user['username'] ?? '-')),
+            DataCell(Text(user['WarehouseName'] ?? '-')),
+            DataCell(Text(user['atasan'] ?? '-')),
+            const DataCell(
+              Icon(Icons.chevron_right, color: Colors.grey),
+            ),
+          ],
+        );
+      }).toList(),
+    ),
+  );
+}
+
 
   Widget _buildUserCard(Map<String, dynamic> user) {
     return Container(
@@ -131,7 +199,11 @@ class ListUserPage extends StatelessWidget {
                 children: [
                   Text(
                     user['nama'] ?? '',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.black87),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text("Username: ${user['username'] ?? '-'}"),
@@ -150,30 +222,85 @@ class ListUserPage extends StatelessWidget {
     );
   }
 
-  Widget _buildUserActionSheet(BuildContext context, Map<String, dynamic> user) {
-    return Wrap(
-      children: [
-        ListTile(
-          leading: const Icon(Icons.edit),
-          title: const Text('Edit User'),
-          onTap: () async {
-            Navigator.pop(context);
-            await Get.to(() => UserManagePage(userData: user));
-            userController.loadUsers();
-          },
-        ),
-        ListTile(
-          leading: const Icon(Icons.lock),
-          title: const Text('Grant Akses'),
-          onTap: () {
-            Navigator.pop(context);
-            Get.to(() => UserGrantPage(
-              userId: user['id'] ?? 0,
-              namaUser: user['nama'] ?? '',
-            ));
-          },
-        ),
-      ],
+  Widget _buildUserActionSheet(
+    BuildContext context,
+    Map<String, dynamic> user,
+  ) {
+    return SafeArea(
+      // Ini akan menghindari area yang tertutup oleh sistem
+      child: Wrap(
+        children: [
+          ListTile(
+            leading: const Icon(Icons.edit),
+            title: const Text('Edit User'),
+            onTap: () async {
+              Navigator.pop(context);
+              await Get.to(() => UserManagePage(userData: user));
+              userController.loadUsers();
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.lock),
+            title: const Text('Grant Akses'),
+            onTap: () {
+              Navigator.pop(context);
+              Get.to(
+                () => UserGrantPage(
+                  userId: user['id'] ?? 0,
+                  namaUser: user['nama'] ?? '',
+                ),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.tune),
+            title: const Text('Setting Warehouse'),
+            onTap: () {
+              Navigator.pop(context);
+              Get.to(
+                () => UserWarehouseSettingPage(
+                  userId: user['id'] ?? 0,
+                  username: user['nama'] ?? '',
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 20),
+        ],
+      ),
     );
   }
+
+  
+}
+class UserDataSource extends DataTableSource {
+  final List<Map<String, dynamic>> users;
+  final void Function(Map<String, dynamic> user) onRowTap;
+
+  UserDataSource(this.users, this.onRowTap);
+
+  @override
+  DataRow getRow(int index) {
+    final user = users[index];
+    return DataRow.byIndex(
+      index: index,
+      cells: [
+        DataCell(Text(user['nama'] ?? '-')),
+        DataCell(Text(user['username'] ?? '-')),
+        DataCell(Text(user['WarehouseName'] ?? '-')),
+        DataCell(Text(user['atasan'] ?? '-')),
+        const DataCell(Icon(Icons.chevron_right, color: Colors.grey)),
+      ],
+      onSelectChanged: (_) => onRowTap(user),
+    );
+  }
+
+  @override
+  bool get isRowCountApproximate => false;
+
+  @override
+  int get rowCount => users.length;
+
+  @override
+  int get selectedRowCount => 0;
 }
