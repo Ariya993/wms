@@ -266,9 +266,9 @@ Future<List<Map<String, dynamic>>> getPickers() async {
       
        
     } catch (e) {
-      Get.snackbar("Error", "Terjadi kesalahan saat: $e");
-      print("Error creating user: $e");
-      return false;
+      // Get.snackbar("Error", "Terjadi kesalahan saat: $e");
+      // print("Error creating user: $e");
+        return false;
     }
   }
   Future<bool> PostWarehouseAuth(Map<String, dynamic> userData) async {

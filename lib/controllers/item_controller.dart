@@ -29,6 +29,9 @@ final RxString filterSearchTerm = ''.obs;
 final RxMap<String, String> warehouseCodeNameMap = <String, String>{}.obs;
   final box = GetStorage();
 
+  var filterType = "equals".obs; // default
+
+
   @override
   void onInit() {
     super.onInit();
@@ -159,7 +162,7 @@ Future<void> loadUserWarehouses(int userId) async {
       } 
      selectedWarehouseFilter.value=code;
       // Sesuaikan dengan struktur API kamu
-      final url = Uri.parse('$apiItem?skip=$skip&filter=$query&code=$code');
+      final url = Uri.parse('$apiItem?skip=$skip&filter=$query&code=$code&filterType=$filterType');
 
       final res = await http.get(
         url,

@@ -8,7 +8,7 @@ import '../services/api_service.dart';
 import '../services/sap_service.dart';
 import '../widgets/custom_dropdown_search.dart';
 
-enum StockInMode { poBased, nonPo }
+enum StockInMode { poBased, nonPo,grgi }
 
 class StockInController extends GetxController {
   final SAPService _apiService = Get.find<SAPService>();
@@ -30,6 +30,12 @@ class StockInController extends GetxController {
   final TextEditingController nonPoQuantityController = TextEditingController();
   final TextEditingController nonPoRemarksController = TextEditingController();
 
+// --- Goods Issue - Goods Receipt ---
+final grgiNumberController = TextEditingController();
+final goodsIssue = Rxn<Map<String, dynamic>>();
+final grgiItems = <Map<String, dynamic>>[].obs;
+
+
   final RxList<Map<String, dynamic>> vendorList = <Map<String, dynamic>>[].obs;
   final RxString selectedVendor = ''.obs;
   Rx<Map<String, dynamic>?> selectedWarehouse = Rx<Map<String, dynamic>?>(null);
@@ -49,6 +55,7 @@ List<TextEditingController> poItemQtyControllers = [];
   @override
   void onClose() {
     poNumberController.dispose();
+    grgiNumberController.dispose();
     nonPoItemCodeController.dispose();
     nonPoItemNameController.dispose();
     nonPoQuantityController.dispose();
@@ -63,9 +70,13 @@ List<TextEditingController> poItemQtyControllers = [];
   void resetForm() {
     isLoading.value = false;
 
-    poNumberController.clear();
+    poNumberController.clear(); 
     purchaseOrder.value = null;
     poItems.clear();
+
+     grgiNumberController.clear();
+    goodsIssue.value = null;
+    grgiItems.clear();
 
     nonPoItems.clear();
     nonPoItemCodeController.clear();
@@ -94,7 +105,217 @@ List<TextEditingController> poItemQtyControllers = [];
       isLoading.value = false;
     }
   }
+ Future<void> searchGrgi() async {
+    if (grgiNumberController.text.isEmpty) {
+      Get.snackbar(
+        'Input Required',
+        'Please enter a Goods Issue Number.',
+        snackPosition: SnackPosition.TOP,
+        backgroundColor: Colors.orange.shade700,
+        colorText: Colors.white,
+      );
+      return;
+    }
 
+    isLoading.value = true;
+    goodsIssue.value = null;
+    grgiItems.clear();
+
+    final data = await _apiService.fetchGIDetails(grgiNumberController.text);
+    isLoading.value = false;
+    print(data);
+    if (data != null) {
+      try {
+        goodsIssue.value = {
+          "docEntry": data["docEntry"],
+          "docNum": data["docNum"],
+          "cardCode": data["cardCode"],
+          "cardName": data["cardName"],
+          "docDate": data["docDate"],
+          "docDueDate": data["docDueDate"],
+           "comments": data["comments"],
+          "documentStatus": data["documentStatus"],
+        };
+        if (goodsIssue.value!["documentStatus"] != "O") {
+          goodsIssue.value = null;
+          Get.snackbar(
+            'Info',
+            'Goods Issue ${data["docNum"]} is not open.',
+            snackPosition: SnackPosition.TOP,
+            backgroundColor: Colors.orangeAccent.shade700,
+            colorText: Colors.white,
+          );
+          return;
+        }
+        final lines = List<Map<String, dynamic>>.from(data["lines"]);
+        // final openItems =
+        //     lines
+        //         .where(
+        //           (item) => (item["RemainingOpenQuantity"] ?? 0) > 0,
+        //         )
+        //         .toList();
+        final openItems = lines
+    .where((item) => (item["RemainingOpenQuantity"] ?? 0) > 0)
+    .map((item) => {
+          ...item,
+          "baseEntry": data["docEntry"], // ← inject docEntry dari header
+        })
+    .toList();
+
+        for (var item in openItems) {
+          item["currentReceivedQuantity"] = 0.0;
+        }
+
+        grgiItems.assignAll(openItems);
+
+        if (openItems.isEmpty) {
+          Get.snackbar(
+            'Info',
+            'Goods Issue ${data["docNum"]} has no open items.',
+            snackPosition: SnackPosition.TOP,
+            backgroundColor: Colors.orangeAccent.shade700,
+            colorText: Colors.white,
+          );
+        }
+        else
+        {
+          Get.snackbar(
+        'GI Number Found',
+        'Please scan QR to add add items',
+        snackPosition: SnackPosition.TOP,
+        backgroundColor: Colors.green.shade700,
+        colorText: Colors.white,
+      );
+        }
+      } catch (e) {
+        Get.snackbar(
+          'Error',
+          'Failed to process Goods Issue data: $e',
+          snackPosition: SnackPosition.TOP,
+          backgroundColor: Colors.red.shade700,
+          colorText: Colors.white,
+        );
+        goodsIssue.value = null;
+      }
+    } 
+  }
+ void updateGrgiItemQuantity(int index, double quantity) {
+    if (index >= 0 && index < grgiItems.length) {
+      final item = grgiItems[index];
+      if (quantity <= (item["RemainingOpenQuantity"] ?? 0)) {
+        item["currentReceivedQuantity"] = quantity;
+      } else { 
+          final rawOpen = item["RemainingOpenQuantity"];
+          final openQty = (rawOpen is num) ? rawOpen.toDouble() : 0.0;
+           
+          quantity=openQty+1;
+          item["currentReceivedQuantity"] = quantity;
+        Get.snackbar(
+          'Warning',
+          'Quantity for "${item["ItemDescription"]}" cannot exceed open quantity (${item["RemainingOpenQuantity"]}).',
+          snackPosition: SnackPosition.TOP,
+          backgroundColor: Colors.orange.shade700,
+          colorText: Colors.white,
+        );
+      
+      }
+       item["currentReceivedQuantity"] = quantity;
+      grgiItems[index] = item; 
+     grgiItems.refresh();
+           }
+  }
+  
+ Future<void> submitGIGoodsReceipt(BuildContext context) async {
+   if (goodsIssue.value == null ||
+        grgiItems.every((item) => item["currentReceivedQuantity"] <= 0)) {
+      Get.snackbar(
+        'Failed',
+        'Please select a valid Goods Issue and ensure at least one item has a received quantity greater than 0.',
+        snackPosition: SnackPosition.TOP,
+        backgroundColor: Colors.orange.shade700,
+        colorText: Colors.white,
+      );
+      return;
+    }
+   
+    final result = await showSubmitDialog(context);
+    if (result == null) return;
+     String warehouse_code =  selectedWarehouse.value?["warehouseCode"] ?? box.read('warehouse_code');
+    final warehouse = {'warehouse_code': warehouse_code};
+
+    final data = await _apiServices.getWarehouseAuth(warehouse);
+    int bpl_id = data?['bpl_id'] ?? box.read('bpl_id');
+    final sapDb = data?['sap_db_name'] ?? box.read('sap_db_name');
+    final sapUser = data?['sap_username'] ?? '';
+    final sapPass = data?['sap_password'] ?? '';
+
+    final loginSuccess = await _apiService.LoginSAP(
+      sap_db: sapDb,
+      sap_username: sapUser,
+      sap_pass: sapPass,
+    );
+    if (!loginSuccess) {
+      Get.snackbar(
+        "Session Expired",
+        "Gagal login ulang. Silakan login manual.",
+        snackPosition: SnackPosition.TOP,
+      );
+      box.erase();
+      Get.offAllNamed('/login');
+    } 
+    
+    final payload = {
+      "DocDate": result['DocDate'],
+      "NumAtCard": result['NoRef'],
+      "BPL_IDAssignedToInvoice": bpl_id,
+      "Comments": result['Comments'],
+      "DocumentLines":
+          grgiItems
+              .map(
+                (e) => {
+                  "ItemCode": e["ItemCode"],
+                  "Quantity": e["currentReceivedQuantity"].toInt(),
+                  "WarehouseCode": warehouse_code,
+                  "BaseType": 60,
+                  "BaseEntry": e['baseEntry'], 
+                  "BaseLine":e["LineNum"]
+                },
+              )
+              .toList(),
+    };
+
+    isLoading.value = true;
+     
+    final success = await _apiService.postGoodsReceiptNonPo(payload);
+     print('stock in controller post:  $success');
+//final success=true;
+    if (success) {
+      Get.snackbar(
+        'Success',
+        'Data has been successfully submitted.',
+        snackPosition: SnackPosition.TOP,
+        backgroundColor: Colors.green.shade700,
+        colorText: Colors.white,
+        duration: Duration(seconds: 3),
+      );
+
+      // Delay reset form biar snackbar sempat muncul
+      Future.delayed(Duration(milliseconds: 500), () {
+        resetForm();
+      });
+    } else {
+      Get.snackbar(
+        'Failed',
+        'Submission failed. Please try again.',
+        snackPosition: SnackPosition.TOP,
+        backgroundColor: Colors.red.shade700,
+        colorText: Colors.white,
+      );
+    }
+  }
+
+ 
+ 
   Future<void> searchPo() async {
     if (poNumberController.text.isEmpty) {
       Get.snackbar(
@@ -158,6 +379,16 @@ List<TextEditingController> poItemQtyControllers = [];
             backgroundColor: Colors.orangeAccent.shade700,
             colorText: Colors.white,
           );
+        }
+        else
+        {
+          Get.snackbar(
+        'PO Number Found',
+        'Please scan QR to add add items',
+        snackPosition: SnackPosition.TOP,
+        backgroundColor: Colors.green.shade700,
+        colorText: Colors.white,
+      );
         }
       } catch (e) {
         Get.snackbar(

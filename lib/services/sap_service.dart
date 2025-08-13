@@ -450,7 +450,7 @@ class SAPService extends GetConnect {
       final session = box.read('sessionId') ?? '';
     final wms_user = box.read('username') ?? '';
       final body = json.encode(goodsReceiptData);
-
+ 
       final response = await http.post(
         url,
         headers: {'session': session,'wms_user':wms_user, 'Content-Type': 'application/json'},
@@ -498,6 +498,77 @@ class SAPService extends GetConnect {
     } 
   }
 
+
+ Future<Map<String, dynamic>?> fetchGIDetails(String poNumber) async {
+    try {
+      final session = box.read('sessionId') ?? '';
+      final body = json.encode({
+        'DocNum': int.parse(poNumber), // Mengirim Set sebagai List<int>
+      });
+
+      final url = Uri.parse(apiGI);
+
+      final response = await http.post(
+        url,
+        headers: {'session': session, 'Content-Type': 'application/json'},
+        body: body,
+      );
+      print(response.statusCode);
+      print(response.body);
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+
+        if (decoded is List && decoded.isNotEmpty) {
+          return decoded.first; // ✅ ambil PO pertama dari list
+        } else {
+          Get.snackbar(
+            'Not Found',
+            'Goods issue tidak ditemukan.',
+            snackPosition: SnackPosition.TOP,
+            backgroundColor: Colors.red,
+            colorText: Colors.white,
+          );
+          return null;
+        }
+      } else if (response.statusCode == 401 ||
+          response.statusCode == 301 ||
+          response.body.contains('Session expired')) {
+        final loginSuccess = await LoginSAP();
+        if (loginSuccess) {
+          return await fetchGIDetails(poNumber);
+        } else {
+          // Gagal login ulang
+          Get.snackbar(
+            "Session Expired",
+            "Gagal login ulang. Silakan login manual.",
+            snackPosition: SnackPosition.TOP,
+          );
+          box.erase();
+          Get.offAllNamed('/login');
+          return null;
+        }
+      } else {
+        Get.snackbar(
+          'Error',
+          'Failed to fetch GI details:',
+          snackPosition: SnackPosition.TOP,
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+        return null;
+      }
+    } catch (e) {
+      Get.snackbar(
+        'Error',
+        'API SAP call failed: $e',
+        snackPosition: SnackPosition.TOP,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+      return null;
+    }
+  }
+
   // Mengembalikan List<Map<String, dynamic>>
   Future<List<Map<String, dynamic>>> getPickPack(
     int skip,
@@ -526,13 +597,14 @@ class SAPService extends GetConnect {
         headers: {
           'session': session,
           'Accept': 'application/json',
+          'Cache-Control': 'max-age=300',
           'warehouse': warehouse.toString(),
           'source': mSource,
           'skip': skip.toString(),
           'str': str.toString(),
         },
       );
-
+      print(response.statusCode);
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
         return data.cast<Map<String, dynamic>>(); // List of documents

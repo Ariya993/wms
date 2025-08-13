@@ -8,6 +8,7 @@ import '../controllers/pick_pack_controller.dart';
 import '../widgets/custom_dropdown_search.dart';
 import '../widgets/loading.dart';
 import 'scanner.dart';
+
 class PickPackManagerPage extends StatefulWidget {
   const PickPackManagerPage({super.key});
 
@@ -16,20 +17,34 @@ class PickPackManagerPage extends StatefulWidget {
 }
 
 class _PickPackManagerPageState extends State<PickPackManagerPage> {
-   late final PickPackController controller;
+  Timer? debounceTimer;
+  late final PickPackController controller;
   late final ItemController itemController;
   late final ScrollController scrollController;
   late final TextEditingController searchController;
-  Timer? debounceTimer;
+
   void initState() {
     super.initState();
     controller = Get.find<PickPackController>();
+
     itemController = Get.find<ItemController>();
     scrollController = ScrollController();
-    searchController = TextEditingController(text: controller.searchQuery.value);
-     controller.fetchPickableItems(reset:true);
+    searchController = TextEditingController(
+      text: controller.searchQuery.value,
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Gunakan fungsi yang sudah ada
+      controller.fetchPickableItems(
+        reset: true,
+        source: controller.filterType.value,
+        warehouse: itemController.selectedWarehouseFilter.value,
+      );
+    });
+
     scrollController.addListener(() {
-      if (scrollController.position.pixels >= scrollController.position.maxScrollExtent - 200 && controller.hasMoreData.value) {
+      if (scrollController.position.pixels >=
+              scrollController.position.maxScrollExtent - 200 &&
+          controller.hasMoreData.value) {
         controller.fetchPickableItems();
       }
     });
@@ -56,7 +71,6 @@ class _PickPackManagerPageState extends State<PickPackManagerPage> {
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
     // final ScrollController scrollController = ScrollController();
@@ -64,7 +78,7 @@ class _PickPackManagerPageState extends State<PickPackManagerPage> {
     // final TextEditingController searchController = TextEditingController(
     //   text: controller.searchQuery.value,
     // );
-    
+
     // Future<void> _navigateToScanner() async {
     //   final result = await Get.to(() => const BarcodeScannerPage());
     //   if (result != null && result is String && result.isNotEmpty) {
@@ -77,14 +91,13 @@ class _PickPackManagerPageState extends State<PickPackManagerPage> {
     //       warehouse: itemController.selectedWarehouseFilter.value,
     //     );
     //   }
-    // }  
+    // }
     // scrollController.addListener(() {
     //   if (scrollController.position.pixels >=
     //           scrollController.position.maxScrollExtent - 200 ) {
     //     controller.fetchPickableItems();
-    //   } 
+    //   }
     // });
-    
 
     return Scaffold(
       appBar: AppBar(
@@ -94,7 +107,7 @@ class _PickPackManagerPageState extends State<PickPackManagerPage> {
         ),
         iconTheme: const IconThemeData(color: Colors.white),
         backgroundColor: Colors.blue.shade700,
-        elevation: 4, 
+        elevation: 4,
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh, color: Colors.white),
@@ -185,7 +198,7 @@ class _PickPackManagerPageState extends State<PickPackManagerPage> {
                             // controller.fetchPickableItems(reset: true);
                             controller.fetchPickableItems(
                               reset: true,
-                              source: "",
+                              source: controller.filterType.value,
                               warehouse:
                                   itemController.selectedWarehouseFilter.value,
                             );
@@ -418,6 +431,7 @@ class _PickPackManagerPageState extends State<PickPackManagerPage> {
                 if (isWeb) {
                   return ListView.builder(
                     controller: scrollController,
+                    cacheExtent: 500,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 12,
                       vertical: 4,
@@ -455,13 +469,18 @@ class _PickPackManagerPageState extends State<PickPackManagerPage> {
                                 SizedBox(
                                   width: isMobile ? constraints.maxWidth : 40,
                                   child: Obx(() {
+                                    // bool canCheckInitially =
+                                    //     item.openQuantity <=
+                                    //         item
+                                    //             .simulatedAvailableQuantity
+                                    //             .value &&
+                                    //     item.simulatedAvailableQuantity.value >
+                                    //         0;
+
                                     bool canCheckInitially =
-                                        item.openQuantity <=
-                                            item
-                                                .simulatedAvailableQuantity
-                                                .value &&
                                         item.simulatedAvailableQuantity.value >
-                                            0;
+                                        0;
+
                                     bool enableCheckboxInteraction =
                                         item.isSelected.value ||
                                         canCheckInitially;
@@ -762,14 +781,17 @@ class _PickPackManagerPageState extends State<PickPackManagerPage> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Obx(() {
+                                    // bool canCheckInitially =
+                                    //     item.openQuantity <=
+                                    //         item
+                                    //             .simulatedAvailableQuantity
+                                    //             .value &&
+                                    //     item.simulatedAvailableQuantity.value >
+                                    //         0;
                                     bool canCheckInitially =
-                                        item.openQuantity <=
-                                            item
-                                                .simulatedAvailableQuantity
-                                                .value &&
                                         item.simulatedAvailableQuantity.value >
-                                            0;
-
+                                        0;
+                                    print(canCheckInitially);
                                     bool enableCheckboxInteraction =
                                         item.isSelected.value ||
                                         canCheckInitially;
@@ -802,6 +824,15 @@ class _PickPackManagerPageState extends State<PickPackManagerPage> {
                                                       val,
                                                     )
                                                 : null,
+                                        // onChanged:
+                                        //     enableCheckboxInteraction
+                                        //         ? (val) => controller
+                                        //             .toggleItemSelection(
+                                        //               controller.pickableItems
+                                        //                   .indexOf(item),
+                                        //               val,
+                                        //             )
+                                        //         : null,
                                         activeColor: Colors.blueAccent,
                                       ),
                                     );
@@ -1025,9 +1056,7 @@ class _PickPackManagerPageState extends State<PickPackManagerPage> {
                                           suffixIcon:
                                               (pickedQty > 0 &&
                                                       (pickedQty >
-                                                          item.openQuantity
-                                                     
-                                                      ))
+                                                          item.openQuantity))
                                                   ? const Icon(
                                                     Icons.warning,
                                                     color: Colors.orange,
@@ -1158,7 +1187,7 @@ class _PickPackManagerPageState extends State<PickPackManagerPage> {
           ],
         );
       }),
-    ); 
+    );
   }
 
   void showPickListDialog(BuildContext context) {

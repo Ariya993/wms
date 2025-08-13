@@ -7,7 +7,7 @@ import 'package:get_storage/get_storage.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:network_info_plus/network_info_plus.dart';
+import 'package:network_info_plus/network_info_plus.dart'; 
 import 'package:wms/main_common.dart';
 import '../helper/endpoint.dart';
 import 'package:device_info_plus/device_info_plus.dart';
@@ -57,8 +57,19 @@ class LoginController extends GetxController {
         await box.write('username', usernameController.text);
         await box.write('token', result['token']);
         await box.write('internalkey', result['internalKey']);
-        await _sendFcmTokenToServer(usernameController.text);
-        await sendDeviceInfoToBackend(result['internalKey']);
+      try {
+    await _sendFcmTokenToServer(usernameController.text);
+  } catch (e) {
+    debugPrint('Gagal kirim FCM token: $e');
+  }
+
+  // Kirim device info tapi juga jangan gagalkan login
+  try {
+    await sendDeviceInfoToBackend(result['internalKey']);
+  } catch (e) {
+    debugPrint('Gagal kirim device info: $e');
+  }
+
         if (!Get.isRegistered<HomeController>()) {
           Get.put(HomeController());
         }
@@ -179,11 +190,15 @@ class LoginController extends GetxController {
     } else {
       // Untuk Mobile/Desktop
       if (Platform.isAndroid) {
-        final androidInfo = await deviceInfoPlugin.androidInfo;
+        final androidInfo = await deviceInfoPlugin.androidInfo; 
         deviceModel = androidInfo.model ?? 'Unknown';
         osVersion = androidInfo.version.release ?? 'Unknown';
-        platform = 'Android';
-         androidId = androidInfo.id ?? 'Unknown'; // Android ID
+        platform = 'Android'; 
+        //print('id = ${PlatformDeviceId.getDeviceId}');
+        // String? deviceId = await PlatformDeviceId.getDeviceId;
+        // print('id = $deviceId');
+        androidId = "${androidInfo.id}|${androidInfo.manufacturer}"?? 'Unknown';  
+
       } else if (Platform.isIOS) {
         final iosInfo = await deviceInfoPlugin.iosInfo;
         deviceModel = iosInfo.utsname.machine ?? 'Unknown';

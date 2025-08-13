@@ -111,7 +111,7 @@ class PickPackController extends GetxController {
   var filterType = 'ALL'.obs;
   int _page = 0;
   int _pageSize = 1; // Mungkin perlu disesuaikan jika ingin fetch lebih banyak per halaman
-  int _maxAutoFetch = 3;
+  int _maxAutoFetch = 5;
   int _autoFetchCount = 0;
     int _loop = 0;
   RxBool hasMoreData = true.obs;
@@ -122,36 +122,29 @@ class PickPackController extends GetxController {
   RxString pickerValue = ''.obs;
   Rx<Map<String, dynamic>?> selectedPicker = Rx<Map<String, dynamic>?>(null);
   RxList<Map<String, dynamic>> Picker = <Map<String, dynamic>>[].obs;
-  final box = GetStorage();
+  final box = GetStorage(); 
+
   RxString note = ''.obs; // Tambahkan ini jika belum ada
 // Tambahkan filteredItems
 RxList<PickableItem> filteredItems = <PickableItem>[].obs;
 
-// Metode untuk melakukan filter data
-void filterItems() { 
-  //  fetchPickableItems(reset:true,source:filterType.value,warehouse: '');
-  // filteredItems.value = pickableItems.where((item) {
-  //   final matchesSearch =
-  //       item.itemCode.toLowerCase().contains(searchQuery.value.toLowerCase()) ||
-  //       item.itemName.toLowerCase().contains(searchQuery.value.toLowerCase());
-
-  //   final matchesFilter =
-  //       filterType.value == 'ALL' || item.docType.toUpperCase() == filterType.value;
-  //   return matchesSearch && matchesFilter;
-  // }).toList();
-}
+ 
 
 @override
 void onInit() {
   super.onInit();
- _init();
+ init();
   // fetchDropdownData();
   // fetchPickableItems(reset: true);
 }
-Future<void> _init() async {
-  await fetchDropdownData();
-   searchQuery.value = '';   
-  await fetchPickableItems(reset: true);
+Future<void> init() async {
+  // await fetchDropdownData();
+  //  searchQuery.value = '';   
+  // await fetchPickableItems(reset: true);
+  await Future.wait([
+    fetchDropdownData(),
+    fetchPickableItems(reset: true)
+  ]);
 }
 
   Future<void> fetchDropdownData() async {
@@ -179,6 +172,7 @@ Future<void> _init() async {
 
   @override
   Future<void> fetchPickableItems({bool reset = false, String? source, String? warehouse}) async {
+ final cacheKey = '${source}_${warehouse}_${_page}';
  
     if (reset) {
       _page = 0;
@@ -197,7 +191,9 @@ Future<void> _init() async {
     warehouse ??= box.read('warehouse_code');
     String mSource=source.toString();
     String mWarehouse=warehouse.toString();
-   
+   print(_page);
+   print(mWarehouse);
+print(mSource);
     try {
       final List<Map<String, dynamic>> pickpack = await _sapB1Service.getPickPack(
         _page * 20, // Offset untuk pagination
@@ -226,7 +222,7 @@ Future<void> _init() async {
                 final String itemName = line['ItemDescription'] ?? 'N/A';
                 final String sourceWarehouseCode =
                     docType == "order" ? line['WarehouseCode'] ?? '' : line['FromWarehouseCode'] ?? '';
-
+                 double onHand = (line['onHand'] as num?)?.toDouble() ?? 0.0;
                 double inStock = (line['InStock'] as num?)?.toDouble() ?? 0.0;
                 double committed = (line['Committed'] as num?)?.toDouble() ?? 0.0;
                 double orderedFromPO = (line['Ordered'] as num?)?.toDouble() ?? 0.0;
@@ -234,6 +230,7 @@ Future<void> _init() async {
 
                 // Hitung availableQuantity (dari InStock - Committed + OrderedFromPO)
                 availableQuantity = inStock;
+                inStock=onHand;
                 if (availableQuantity < 0) availableQuantity = 0.0; // Pastikan tidak negatif
 
                 tempItems.add(
@@ -259,12 +256,23 @@ Future<void> _init() async {
             }
           }
         }
-        pickableItems.addAll(tempItems);
-        // Panggil ini setelah semua item baru ditambahkan
-        
+
+          for (var item in tempItems) {
+            bool isDuplicate = pickableItems.any((existing) =>
+              existing.itemCode == item.itemCode &&
+              existing.docType == item.docType &&
+              existing.sourceWarehouseCode == item.sourceWarehouseCode &&
+              existing.docEntry == item.docEntry &&
+              existing.docLineNum == item.docLineNum);
+
+            if (!isDuplicate) {
+              pickableItems.add(item);
+            }
+          }
+ 
         _page++;
         // Otomatis fetch jika data kurang dari 5 dan masih ada data
-        if (tempItems.length <= 10 && _autoFetchCount < _maxAutoFetch) {
+        if (tempItems.length <= 8 && _autoFetchCount < _maxAutoFetch) {
           // if(_autoFetchCount == 0)
           // {
           _autoFetchCount++;
@@ -337,7 +345,7 @@ Future<void> _init() async {
                 final String itemName = line['ItemDescription'] ?? 'N/A';
                 final String sourceWarehouseCode =
                     docType == "order" ? line['WarehouseCode'] ?? '' : line['FromWarehouseCode'] ?? '';
-
+                double onHand = (line['onHand'] as num?)?.toDouble() ?? 0.0;
                 double inStock = (line['InStock'] as num?)?.toDouble() ?? 0.0;
                 double committed = (line['Committed'] as num?)?.toDouble() ?? 0.0;
                 double orderedFromPO = (line['Ordered'] as num?)?.toDouble() ?? 0.0;
@@ -345,6 +353,7 @@ Future<void> _init() async {
 
                 // Hitung availableQuantity (dari InStock - Committed + OrderedFromPO)
                 availableQuantity = inStock;
+                inStock=onHand;
                 if (availableQuantity < 0) availableQuantity = 0.0; // Pastikan tidak negatif
 
                 tempItems.add(
@@ -626,7 +635,7 @@ Future<void> _init() async {
         "Remarks": note,
         "PickListsLines": pickListLines,
       };
-
+      print('Picker value : ${selectedPicker.value?['username']}');
       final createdPickList = await _sapB1Service.createPickList(
         newPickListPayload,itemcontroller.selectedWarehouseFilter.value
       );

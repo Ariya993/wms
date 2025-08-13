@@ -61,189 +61,402 @@ class _ItemPageState extends State<ItemPage> with TickerProviderStateMixin {
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: itemController.searchController,
-                    decoration: InputDecoration(
-                      hintText: 'Cari item...',
-                      prefixIcon: const Icon(Icons.search),
-                      suffixIcon: Obx(
-                        () =>
-                            itemController.searchQuery.value.isNotEmpty
-                                ? IconButton(
-                                  icon: const Icon(Icons.clear),
-                                  onPressed: () {
-                                    itemController.searchController.clear();
-                                    itemController.searchQuery.value = '';
-                                    itemController.resetItems();
-                                  },
-                                )
-                                : const SizedBox(),
-                      ),
-                      border: const OutlineInputBorder(),
-                    ),
-                    onSubmitted: (value) {
-                      itemController.searchQuery.value = value.trim();
-                      itemController.fetchItems();
-                    },
-                  ),
-                ),
+  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8),
+  child: Row(
+    children: [
+      Expanded(
+        child: TextField(
+          controller: itemController.searchController,
+          decoration: InputDecoration(
+            hintText: 'Cari item...',
+            prefixIcon: const Icon(Icons.search),
+            suffixIcon: Obx(
+              () => itemController.searchQuery.value.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: () {
+                        itemController.searchController.clear();
+                        itemController.searchQuery.value = '';
+                        itemController.resetItems();
+                      },
+                    )
+                  : const SizedBox(),
+            ),
+            border: const OutlineInputBorder(),
+          ),
+          onSubmitted: (value) {
+            itemController.searchQuery.value = value.trim();
+            itemController.fetchItems();
+          },
+        ),
+      ),
+      const SizedBox(width: 8),
 
-                const SizedBox(width: 8),
-                SizedBox(
-                  height: 48, // tinggi tombol agar terlihat kotak
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue, // warna latar biru
-                      foregroundColor: Colors.white, // warna teks
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                      ), // padding horizontal
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(4), // bentuk kotak
+      // 👇 Tambahkan filter type
+      
+
+      SizedBox(
+        height: 48,
+        child: ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.blue,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+          onPressed: () {
+            itemController.searchQuery.value =
+                itemController.searchController.text.trim();
+            itemController.fetchItems();
+          },
+          child: const Text("Search"),
+        ),
+      ),
+    ],
+  ),
+),
+
+          // Padding(
+          //   padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8),
+          //   child: Row(
+          //     children: [
+          //       Expanded(
+          //         child: TextField(
+          //           controller: itemController.searchController,
+          //           decoration: InputDecoration(
+          //             hintText: 'Cari item...',
+          //             prefixIcon: const Icon(Icons.search),
+          //             suffixIcon: Obx(
+          //               () =>
+          //                   itemController.searchQuery.value.isNotEmpty
+          //                       ? IconButton(
+          //                         icon: const Icon(Icons.clear),
+          //                         onPressed: () {
+          //                           itemController.searchController.clear();
+          //                           itemController.searchQuery.value = '';
+          //                           itemController.resetItems();
+          //                         },
+          //                       )
+          //                       : const SizedBox(),
+          //             ),
+          //             border: const OutlineInputBorder(),
+          //           ),
+          //           onSubmitted: (value) {
+          //             itemController.searchQuery.value = value.trim();
+          //             itemController.fetchItems();
+          //           },
+          //         ),
+          //       ),
+
+          //       const SizedBox(width: 8),
+          //       SizedBox(
+          //         height: 48, // tinggi tombol agar terlihat kotak
+          //         child: ElevatedButton(
+          //           style: ElevatedButton.styleFrom(
+          //             backgroundColor: Colors.blue, // warna latar biru
+          //             foregroundColor: Colors.white, // warna teks
+          //             padding: const EdgeInsets.symmetric(
+          //               horizontal: 20,
+          //             ), // padding horizontal
+          //             shape: RoundedRectangleBorder(
+          //               borderRadius: BorderRadius.circular(4), // bentuk kotak
+          //             ),
+          //           ),
+          //           onPressed: () {
+          //             itemController.searchQuery.value =
+          //                 itemController.searchController.text.trim();
+          //             itemController.fetchItems();
+          //           },
+          //           child: const Text("Cari"),
+          //         ),
+          //       ),
+          //     ],
+          //   ),
+          // ),
+          const SizedBox(width: 8),
+
+          // Padding(
+          //   padding: const EdgeInsets.only(right: 16.0), // tambahkan ini
+          //   child: Align(
+          //     alignment: Alignment.centerRight,
+
+          //     child: Obx(() {
+          //       final warehouses = itemController.selectedWarehouses.toList();
+
+          //       if (warehouses.isEmpty) return const SizedBox();
+
+          //       return GestureDetector(
+          //         onTapDown: (details) {
+          //           final Offset offset = details.globalPosition;
+          //           final double dx =
+          //               offset.dx + MediaQuery.of(context).size.width;
+          //           final double dy = offset.dy;
+
+          //           showMenu(
+          //             context: context,
+          //             position: RelativeRect.fromLTRB(dx, dy, 0, 0),
+          //             items: [
+          //               PopupMenuItem<String>(
+          //                 enabled: false,
+          //                 padding:
+          //                     EdgeInsets.zero, // Hindari padding default item
+          //                 child: Obx(
+          //                   () => Material(
+          //                     color: Colors.white, // 💥 Material putih solid
+          //                     child: Column(
+          //                       mainAxisSize: MainAxisSize.min,
+          //                       children: [
+          //                         TextField(
+          //                           style: const TextStyle(
+          //                             fontSize: 16,
+          //                           ), // ukuran teks lebih besar
+          //                           decoration: const InputDecoration(
+          //                             hintText: 'Cari warehouse...',
+          //                             fillColor: Colors.white,
+          //                             border: OutlineInputBorder(),
+          //                             isDense: true, // rapat tapi tetap nyaman
+          //                             contentPadding: EdgeInsets.symmetric(
+          //                               horizontal: 12,
+          //                               vertical:
+          //                                   12, // padding lebih luas secara vertikal
+          //                             ),
+          //                           ),
+          //                           onChanged:
+          //                               (value) => itemController
+          //                                   .filterWarehouseSearch(value),
+          //                         ),
+
+          //                         const SizedBox(height: 8),
+          //                         SizedBox(
+          //                           height: 350,
+          //                           width: 200,
+          //                           child: ListView(
+          //                             shrinkWrap: true,
+          //                             children:
+          //                                 itemController.filteredWarehouseList.map((
+          //                                   w,
+          //                                 ) {
+          //                                   final name =
+          //                                       itemController
+          //                                           .warehouseCodeNameMap[w] ??
+          //                                       w; // cari nama
+          //                                   return ListTile(
+          //                                     title: Text(
+          //                                       name,
+          //                                     ), // ✅ tampilkan nama gudangnya
+          //                                     tileColor: Colors.white,
+          //                                     textColor: Colors.black,
+          //                                     onTap: () {
+          //                                       itemController
+          //                                           .selectedWarehouseFilter
+          //                                           .value = w;
+          //                                       itemController.resetItems();
+          //                                       Navigator.pop(context);
+          //                                     },
+          //                                   );
+          //                                 }).toList(),
+          //                           ),
+          //                         ),
+          //                       ],
+          //                     ),
+          //                   ),
+          //                 ),
+          //               ),
+          //             ],
+          //           );
+          //         },
+          //         child: Container(
+          //           padding: const EdgeInsets.symmetric(
+          //             horizontal: 12,
+          //             vertical: 14,
+          //           ),
+          //           decoration: BoxDecoration(
+          //             border: Border.all(color: Colors.grey.shade400),
+          //             borderRadius: BorderRadius.circular(6),
+          //           ),
+          //           child: Row(
+          //             mainAxisSize: MainAxisSize.min,
+
+          //             children: [
+          //               Text(
+          //                 itemController.selectedWarehouseFilter.value.isEmpty
+          //                     ? 'Warehouse'
+          //                     : itemController
+          //                             .warehouseCodeNameMap[itemController
+          //                             .selectedWarehouseFilter
+          //                             .value] ??
+          //                         'Warehouse',
+          //                 style: const TextStyle(
+          //                   fontSize: 14,
+          //                   fontWeight: FontWeight.w500,
+          //                 ),
+          //               ),
+
+          //               const Icon(Icons.arrow_drop_down),
+          //             ],
+          //           ),
+          //         ),
+          //       );
+          //     }),
+          //   ),
+          // ),
+          Padding(
+  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8),
+  child: Row(
+    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    children: [
+      /// 🔽 Filter Type (Like / Equals)
+      Obx(() => PopupMenuButton<String>(
+            onSelected: (value) {
+              itemController.filterType.value = value;
+              itemController.resetItems(); // Optional: reset item jika diperlukan
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: "like",
+                child: Text("Like"),
+              ),
+              const PopupMenuItem(
+                value: "equals",
+                child: Text("Equals"),
+              ),
+            ],
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 14,
+              ),
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey.shade400),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    itemController.filterType.value.capitalizeFirst ?? "",
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey,
+                    ),
+                  ),
+                  const Icon(Icons.filter_list, color: Colors.grey),
+                ],
+              ),
+            ),
+          )),
+
+      const SizedBox(width: 8),
+
+      /// 🏢 Warehouse Dropdown
+      Obx(() {
+        final warehouses = itemController.selectedWarehouses.toList();
+
+        if (warehouses.isEmpty) return const SizedBox();
+
+        return GestureDetector(
+          onTapDown: (details) {
+            final Offset offset = details.globalPosition;
+            final double dx =
+                offset.dx + MediaQuery.of(context).size.width;
+            final double dy = offset.dy;
+
+            showMenu(
+              context: context,
+              position: RelativeRect.fromLTRB(dx, dy, 0, 0),
+              items: [
+                PopupMenuItem<String>(
+                  enabled: false,
+                  padding: EdgeInsets.zero,
+                  child: Obx(
+                    () => Material(
+                      color: Colors.white,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          TextField(
+                            decoration: const InputDecoration(
+                              hintText: 'Cari warehouse...',
+                              fillColor: Colors.white,
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 12,
+                              ),
+                            ),
+                            onChanged: (value) => itemController
+                                .filterWarehouseSearch(value),
+                          ),
+                          const SizedBox(height: 8),
+                          SizedBox(
+                            height: 350,
+                            width: 200,
+                            child: ListView(
+                              shrinkWrap: true,
+                              children: itemController.filteredWarehouseList.map(
+                                (w) {
+                                  final name = itemController
+                                          .warehouseCodeNameMap[w] ??
+                                      w;
+                                  return ListTile(
+                                    title: Text(name),
+                                    tileColor: Colors.white,
+                                    textColor: Colors.black,
+                                    onTap: () {
+                                      itemController
+                                          .selectedWarehouseFilter.value = w;
+                                      itemController.resetItems();
+                                      Navigator.pop(context);
+                                    },
+                                  );
+                                },
+                              ).toList(),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    onPressed: () {
-                      itemController.searchQuery.value =
-                          itemController.searchController.text.trim();
-                      itemController.fetchItems();
-                    },
-                    child: const Text("Cari"),
                   ),
                 ),
               ],
+            );
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 14,
             ),
-          ),
-          const SizedBox(width: 8),
-
-          Padding(
-            padding: const EdgeInsets.only(right: 16.0), // tambahkan ini
-            child: Align(
-              alignment: Alignment.centerRight,
-
-              child: Obx(() {
-                final warehouses = itemController.selectedWarehouses.toList();
-
-                if (warehouses.isEmpty) return const SizedBox();
-
-                return GestureDetector(
-                  onTapDown: (details) {
-                    final Offset offset = details.globalPosition;
-                    final double dx =
-                        offset.dx + MediaQuery.of(context).size.width;
-                    final double dy = offset.dy;
-
-                    showMenu(
-                      context: context,
-                      position: RelativeRect.fromLTRB(dx, dy, 0, 0),
-                      items: [
-                        PopupMenuItem<String>(
-                          enabled: false,
-                          padding:
-                              EdgeInsets.zero, // Hindari padding default item
-                          child: Obx(
-                            () => Material(
-                              color: Colors.white, // 💥 Material putih solid
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  TextField(
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                    ), // ukuran teks lebih besar
-                                    decoration: const InputDecoration(
-                                      hintText: 'Cari warehouse...',
-                                      fillColor: Colors.white,
-                                      border: OutlineInputBorder(),
-                                      isDense: true, // rapat tapi tetap nyaman
-                                      contentPadding: EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical:
-                                            12, // padding lebih luas secara vertikal
-                                      ),
-                                    ),
-                                    onChanged:
-                                        (value) => itemController
-                                            .filterWarehouseSearch(value),
-                                  ),
-
-                                  const SizedBox(height: 8),
-                                  SizedBox(
-                                    height: 350,
-                                    width: 200,
-                                    child: ListView(
-                                      shrinkWrap: true,
-                                      children:
-                                          itemController.filteredWarehouseList.map((
-                                            w,
-                                          ) {
-                                            final name =
-                                                itemController
-                                                    .warehouseCodeNameMap[w] ??
-                                                w; // cari nama
-                                            return ListTile(
-                                              title: Text(
-                                                name,
-                                              ), // ✅ tampilkan nama gudangnya
-                                              tileColor: Colors.white,
-                                              textColor: Colors.black,
-                                              onTap: () {
-                                                itemController
-                                                    .selectedWarehouseFilter
-                                                    .value = w;
-                                                itemController.resetItems();
-                                                Navigator.pop(context);
-                                              },
-                                            );
-                                          }).toList(),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 14,
-                    ),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.shade400),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-
-                      children: [
-                        Text(
-                          itemController.selectedWarehouseFilter.value.isEmpty
-                              ? 'Warehouse'
-                              : itemController
-                                      .warehouseCodeNameMap[itemController
-                                      .selectedWarehouseFilter
-                                      .value] ??
-                                  'Warehouse',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-
-                        const Icon(Icons.arrow_drop_down),
-                      ],
-                    ),
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey.shade400),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  itemController.selectedWarehouseFilter.value.isEmpty
+                      ? 'Warehouse'
+                      : itemController.warehouseCodeNameMap[
+                              itemController.selectedWarehouseFilter.value] ??
+                          'Warehouse',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
                   ),
-                );
-              }),
+                ),
+                const Icon(Icons.arrow_drop_down),
+              ],
             ),
           ),
+        );
+      }),
+    ],
+  ),
+),
+
           Expanded(
             child: Obx(() {
               if (itemController.isLoading.value &&

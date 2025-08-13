@@ -20,6 +20,7 @@ final apiItem= "$apiURL/SAPItem/wms";
 final apiScanItem= "$apiURL/SAPItem/scan";
 final apiItemHeader= "$apiURL/SAPItem/header";
 final apiPO= "$apiURL/SAPPO";
+final apiGI= "$apiURL/SAPGI";
 final apiPickPack= "$apiURL/SAPPickPack"; 
 final apiScanPickPack= "$apiURL/SAPPickPack/scan"; 
 final apiPickList= "$apiURL/SAPPickList"; 

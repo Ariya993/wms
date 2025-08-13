@@ -114,135 +114,146 @@ class _StockInPageState extends State<StockInPage>
   final StockInController controller = Get.put(StockInController());
   late TabController _tabController;
   final List<TextEditingController> _nonPoQtyControllers = [];
-List<TextEditingController> poItemQtyControllers = [];
-
+  List<TextEditingController> poItemQtyControllers = [];
+  List<TextEditingController> GIItemQtyControllers = [];
   @override
   void initState() {
     super.initState();
     _tabController = TabController(
-      length: 2,
+      length: 3,
       vsync: this,
-      initialIndex: controller.currentMode.value == StockInMode.poBased ? 0 : 1,
+      initialIndex:
+          controller.currentMode.value == StockInMode.poBased
+              ? 0
+              : controller.currentMode.value == StockInMode.nonPo
+              ? 1
+              : 2,
+      // initialIndex: controller.currentMode.value == StockInMode.poBased ? 0 : 1,
     );
 
+    // _tabController.addListener(() {
+    //   if (_tabController.indexIsChanging) return;
+    //   if (_tabController.index == 0) {
+    //     controller.setMode(StockInMode.poBased);
+    //   } else {
+    //     controller.setMode(StockInMode.nonPo);
+    //   }
+    // });
     _tabController.addListener(() {
       if (_tabController.indexIsChanging) return;
       if (_tabController.index == 0) {
         controller.setMode(StockInMode.poBased);
-      } else {
+      } else if (_tabController.index == 1) {
         controller.setMode(StockInMode.nonPo);
+      } else {
+        controller.setMode(StockInMode.grgi); // Tambah mode baru
       }
     });
 
     _syncQtyControllers();
- //initPoItemQtyControllers();
-  // Auto sync saat nonPoItems berubah
-  ever(controller.nonPoItems, (_) => _syncQtyControllers());
-  ever(controller.poItems, (_) => _syncQtyControllers());
+    //initPoItemQtyControllers();
+    // Auto sync saat nonPoItems berubah
+    ever(controller.nonPoItems, (_) => _syncQtyControllers());
+    ever(controller.poItems, (_) => _syncQtyControllers());
+    ever(controller.grgiItems, (_) => _syncQtyControllers());
   }
 
- void initPoItemQtyControllers() {
-    poItemQtyControllers = controller.poItems.map((item) {
-      return TextEditingController(
-        text: item["currentReceivedQuantity"]?.toStringAsFixed(0) ?? '0',
+  void _syncQtyControllers() {
+    final items = controller.nonPoItems;
+    while (_nonPoQtyControllers.length < items.length) {
+      final idx = _nonPoQtyControllers.length;
+      final qty = (items[idx]['currentReceivedQuantity'] ?? 0).toInt();
+      _nonPoQtyControllers.add(
+        TextEditingController(text: qty == 0 ? '' : qty.toString()),
       );
-    }).toList();
+    }
+
+    final poitems = controller.poItems;
+    while (poItemQtyControllers.length < poitems.length) {
+      final idx = poItemQtyControllers.length;
+      final qty = (poitems[idx]['currentReceivedQuantity'] ?? 0).toInt();
+      poItemQtyControllers.add(
+        TextEditingController(text: qty == 0 ? '' : qty.toString()),
+      );
+    }
+
+    final grgiItems = controller.grgiItems;
+    while (GIItemQtyControllers.length < grgiItems.length) {
+      final idx = GIItemQtyControllers.length;
+      final qty = (grgiItems[idx]['currentReceivedQuantity'] ?? 0).toInt();
+      GIItemQtyControllers.add(
+        TextEditingController(text: qty == 0 ? '' : qty.toString()),
+      );
+    }
   }
 
-void _syncQtyControllers() {
-  final items = controller.nonPoItems;
-  while (_nonPoQtyControllers.length < items.length) {
-    final idx = _nonPoQtyControllers.length;
-    final qty = (items[idx]['currentReceivedQuantity'] ?? 0).toInt();
-    _nonPoQtyControllers.add(
-      TextEditingController(text: qty == 0 ? '' : qty.toString()),
-    );
-  }
-
-  final poitems = controller.poItems;
-  while (poItemQtyControllers.length < poitems.length) {
-    final idx = poItemQtyControllers.length;
-    final qty = (poitems[idx]['currentReceivedQuantity'] ?? 0).toInt();
-    poItemQtyControllers.add(
-      TextEditingController(text: qty == 0 ? '' : qty.toString()),
-    );
-  }
-}
   @override
   void dispose() {
     _tabController.dispose();
-     for (final c in _nonPoQtyControllers) {
-    c.dispose();
-  }
+    for (final c in _nonPoQtyControllers) {
+      c.dispose();
+    }
 
- for (final c in poItemQtyControllers) {
-    c.dispose();
-  }
+    for (final c in poItemQtyControllers) {
+      c.dispose();
+    }
 
-  //  for (var controller in poItemQtyControllers) {
-  //     controller.dispose();
-  //   }
+    for (final c in GIItemQtyControllers) {
+      c.dispose();
+    }
+
     super.dispose();
   }
 
   Future<void> _navigateToScanner() async {
     final result = await Get.to(() => const BarcodeScannerPage());
     if (result != null && result is String && result.isNotEmpty) {
-      
-     controller.handleScanResult(result);
-    if(controller.currentMode.value == StockInMode.poBased)
-    {
-      if (controller.poItems.isNotEmpty)
-      {
+      controller.handleScanResult(result);
+      if (controller.currentMode.value == StockInMode.poBased) {
+        if (controller.poItems.isNotEmpty) {
           final itemIndex = controller.poItems.indexWhere(
             (item) => item["ItemCode"] == result,
           );
           print(itemIndex);
-          if(itemIndex >= 0)
-          { 
+          if (itemIndex >= 0) {
+            String textValue = poItemQtyControllers[itemIndex].text;
             final item = controller.poItems[itemIndex];
             final openQty = item["RemainingOpenInventoryQuantity"] ?? 0;
-            final currentQty = item["currentReceivedQuantity"] ?? 0; 
-            if (currentQty < openQty) {
-             
-                String textValue = poItemQtyControllers[itemIndex].text;
-                int cQty = textValue.isEmpty ? 0 : int.tryParse(textValue) ?? 0;
-                int newQty = cQty + 1; 
-                poItemQtyControllers[itemIndex].text = newQty.toString();
-
-            } else {
-              Get.snackbar(
-                'Max Quantity',
-                'Qty untuk "${item["ItemDescription"]}" sudah mencapai limit open ($openQty).',
-                snackPosition: SnackPosition.TOP,
-                backgroundColor: Colors.orange.shade700,
-                colorText: Colors.white,
-              );
-            }
-            
-           
-          } 
-      } 
-    }
-    else{
-      if (controller.nonPoItems.isNotEmpty)
-      {
+            final currentQty = item["currentReceivedQuantity"] ?? 0;
+             poItemQtyControllers[itemIndex].text =currentQty.toInt().toString();
+ 
+          }
+        }
+      } else if (controller.currentMode.value == StockInMode.grgi) {
+        if (controller.grgiItems.isNotEmpty) {
+          final itemIndex = controller.grgiItems.indexWhere(
+            (item) => item["ItemCode"] == result,
+          );
+          print(itemIndex);
+          if (itemIndex >= 0) {
+            String textValue = GIItemQtyControllers[itemIndex].text;
+            final item = controller.grgiItems[itemIndex];
+            final openQty = item["RemainingOpenQuantity"] ?? 0;
+            final currentQty = item["currentReceivedQuantity"] ?? 0;
+            GIItemQtyControllers[itemIndex].text =currentQty.toInt().toString();
+          }
+        }
+      } else {
+        if (controller.nonPoItems.isNotEmpty) {
           final itemIndex = controller.nonPoItems.indexWhere(
             (item) => item["ItemCode"] == result,
           );
           print(itemIndex);
-          if(itemIndex >= 0)
-          { 
+          if (itemIndex >= 0) {
             String textValue = _nonPoQtyControllers[itemIndex].text;
-            int currentQty = textValue.isEmpty ? 0 : int.tryParse(textValue) ?? 0;
+            int currentQty =
+                textValue.isEmpty ? 0 : int.tryParse(textValue) ?? 0;
             int newQty = currentQty + 1;
 
-  
-              _nonPoQtyControllers[itemIndex].text = newQty.toString();
-          } 
-      } 
-    }
-      
+            _nonPoQtyControllers[itemIndex].text = newQty.toString();
+          }
+        }
+      }
     }
   }
 
@@ -258,6 +269,8 @@ void _syncQtyControllers() {
             onPressed: () {
               if (controller.currentMode.value == StockInMode.poBased) {
                 controller.submitPoGoodsReceipt(context);
+              } else if (controller.currentMode.value == StockInMode.grgi) {
+                controller.submitGIGoodsReceipt(context);
               } else {
                 controller.submitNonPoGoodsReceipt(context);
               }
@@ -291,7 +304,12 @@ void _syncQtyControllers() {
 
         return TabBarView(
           controller: _tabController,
-          children: [_buildPoBasedForm(context), _buildNonPoForm(context)],
+          children: [
+            _buildPoBasedForm(context),
+            _buildNonPoForm(context),
+            _buildGrGiForm(context), // Form baru
+          ],
+          // children: [_buildPoBasedForm(context), _buildNonPoForm(context)],
         );
       }),
       bottomNavigationBar: SizedBox(
@@ -319,7 +337,12 @@ void _syncQtyControllers() {
               fontSize: 12,
               fontWeight: FontWeight.bold,
             ),
-            tabs: const [Tab(text: "PO Based"), Tab(text: "Non-PO")],
+            tabs: const [
+              Tab(text: "PO Based"),
+              Tab(text: "Transfer Request"),
+              Tab(text: "Goods Issue"), // Tab baru
+            ],
+            // tabs: const [Tab(text: "PO Based"), Tab(text: "Non-PO")],
             //   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap, // <- ini menghapus padding default
           ),
         ),
@@ -414,22 +437,18 @@ void _syncQtyControllers() {
             Obx(() {
               if (controller.purchaseOrder.value == null) {
                 return const Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.business_center,
-                          color: Colors.grey,
-                          size: 60,
-                        ),
-                        SizedBox(height: 10),
-                        Text(
-                          'Please search the PO number',
-                          style: TextStyle(color: Colors.grey, fontSize: 16),
-                        ),
-                      ],
-                    ),
-                  );
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.business_center, color: Colors.grey, size: 60),
+                      SizedBox(height: 10),
+                      Text(
+                        'Please search the PO number',
+                        style: TextStyle(color: Colors.grey, fontSize: 16),
+                      ),
+                    ],
+                  ),
+                );
 
                 // return const Center(
                 //   child: Padding(
@@ -496,159 +515,493 @@ void _syncQtyControllers() {
                     itemCount: controller.poItems.length,
                     itemBuilder: (context, index) {
                       final item = controller.poItems[index];
-
-                      return Container(
-                        margin: const EdgeInsets.symmetric(vertical: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.grey.shade300,
-                              blurRadius: 6,
-                              offset: const Offset(0, 2),
+                      return AnimatedOpacity(
+                        duration: const Duration(milliseconds: 500),
+                        opacity:
+                            (item["currentReceivedQuantity"] ?? 0.1) > 0
+                                ? 1.0
+                                : 0.0,
+                        child: IgnorePointer(
+                          ignoring:
+                              (item["currentReceivedQuantity"] ?? 0.1) <= 0,
+                          child: Container(
+                            margin: const EdgeInsets.symmetric(vertical: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.grey.shade300,
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Nama Item
-                              Text(
-                                "${item["ItemDescription"]} (${item["ItemCode"]})",
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                "Bin Loc : ${item["BinLoc"]}",
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
 
-                              // Info Qty
-                              Text(
-                                "Ordered: ${item["Quantity"]} | Received: ${item["ReceivedQuantity"] ?? 0} | Open: ${item["RemainingOpenInventoryQuantity"]}",
-                                style: TextStyle(color: Colors.grey.shade700),
-                              ),
-                              const SizedBox(height: 12),
-
-                              // Input Quantity
-                              Row(
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  IconButton(
-                                    icon: const Icon(
-                                      Icons.remove_circle_outline,
-                                      color: Colors.red,
+                                  // Nama Item
+                                  Text(
+                                    "${item["ItemDescription"]} (${item["ItemCode"]})",
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
                                     ),
-                                     onPressed: () {
-                                      final currentQty = item["currentReceivedQuantity"] ?? 0.0;
-                                      if (currentQty > 0) {
-                                        final newQty = (currentQty - 1).clamp(0.0, double.infinity);
-                                        controller.updatePoItemQuantity(index, newQty);
-                                        poItemQtyControllers[index].text =
-                                            newQty == 0.0 ? '' : newQty.toInt().toString();
-                                      }
-                                    }, 
                                   ),
-                                  SizedBox(
-                                    width: 100,
-                                    height: 38,
-                                    child: TextField(
-                                      controller: poItemQtyControllers[index],
-                                      // controller: TextEditingController(
-                                      //   text:
-                                      //       item["currentReceivedQuantity"] ==
-                                      //               0.0
-                                      //           ? ''
-                                      //           : item["currentReceivedQuantity"]
-                                      //               .toStringAsFixed(0),
-                                      // ),
-                                      textAlign: TextAlign.center,
-                                      decoration: InputDecoration(
-                                        hintText: "0",
-                                        filled: true,
-                                        fillColor: Colors.white,
-                                        isDense: true,
-                                        contentPadding:
-                                            const EdgeInsets.symmetric(
-                                              vertical: 4,
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    "Bin Loc : ${item["BinLoc"]}",
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+
+                                  // Info Qty
+                                  Text(
+                                    "Ordered: ${item["Quantity"]} | Received: ${item["ReceivedQuantity"] ?? 0} | Open: ${item["RemainingOpenInventoryQuantity"]}",
+                                    style: TextStyle(
+                                      color: Colors.grey.shade700,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+
+                                  // Input Quantity
+                                  Row(
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(
+                                          Icons.remove_circle_outline,
+                                          color: Colors.red,
+                                        ),
+                                        onPressed: () {
+                                          final currentQty =
+                                              item["currentReceivedQuantity"] ??
+                                              0.0;
+                                          if (currentQty > 0) {
+                                            final newQty = (currentQty - 1)
+                                                .clamp(0.0, double.infinity);
+                                            controller.updatePoItemQuantity(
+                                              index,
+                                              newQty,
+                                            );
+                                            poItemQtyControllers[index].text =
+                                                newQty == 0.0
+                                                    ? ''
+                                                    : newQty.toInt().toString();
+                                          }
+                                        },
+                                      ),
+                                      SizedBox(
+                                        width: 100,
+                                        height: 38,
+                                        child: TextField(
+                                          controller:
+                                              poItemQtyControllers[index],
+                                          textAlign: TextAlign.center,
+                                          decoration: InputDecoration(
+                                            hintText: "0",
+                                            filled: true,
+                                            fillColor: Colors.white,
+                                            isDense: true,
+                                            contentPadding:
+                                                const EdgeInsets.symmetric(
+                                                  vertical: 4,
+                                                ),
+                                            border: OutlineInputBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
                                             ),
-                                        border: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            8,
                                           ),
+                                          keyboardType:
+                                              const TextInputType.numberWithOptions(
+                                                decimal: false,
+                                              ),
+                                          onChanged: (value) {
+                                            controller.updatePoItemQuantity(
+                                              index,
+                                              double.tryParse(value) ?? 0.0,
+                                            );
+                                          },
                                         ),
                                       ),
-                                      keyboardType:
-                                          const TextInputType.numberWithOptions(
-                                            decimal: false,
-                                          ),
-                                      onChanged: (value) {
-                                        controller.updatePoItemQuantity(
-                                          index,
-                                          double.tryParse(value) ?? 0.0,
-                                        );
-                                      },
-                                    ),
-                                  ),
-                                  
-                                  IconButton(
-                                    icon: const Icon(
-                                      Icons.add_circle,
-                                      color: Colors.green,
-                                    ),
-                                    // onPressed: () {
-                                    //   final currentQty = item["currentReceivedQuantity"] ?? 0.0;
-                                    //   if (currentQty > 0) {
-                                    //     final newQty = (currentQty - 1).clamp(0.0, double.infinity);
-                                    //     controller.updatePoItemQuantity(index, newQty);
-                                    //     poItemQtyControllers[index].text =
-                                    //         newQty == 0.0 ? '' : newQty.toInt().toString();
-                                    //   }
-                                    // }, 
-                                    onPressed: () {
-                                      final currentQty =
-                                          item["currentReceivedQuantity"] ??
-                                          0.0;
-                                      final maxQty =
-                                          item["RemainingOpenInventoryQuantity"] ??
-                                          0.0;
-                                      if (currentQty < maxQty) {
-                                          final newQty = (currentQty + 1).clamp(0.0, double.infinity);
-                                        controller.updatePoItemQuantity(
-                                          index,
-                                          newQty,
-                                        );
-                                         poItemQtyControllers[index].text = newQty.toInt().toString();
-                                      }
-                                    },
-                                  ),
-                                  const Spacer(),
-                                  IconButton(
-                                    icon: const Icon(
-                                      Icons.clear,
-                                      color: Colors.red,
-                                    ),
-                                    
-                                    onPressed: () {
-                                      controller.updatePoItemQuantity(
-                                        index,
-                                        0.0,
-                                      );
-                                      poItemQtyControllers[index].text="0";
-                                    },
+
+                                      IconButton(
+                                        icon: const Icon(
+                                          Icons.add_circle,
+                                          color: Colors.green,
+                                        ),
+                                        onPressed: () {
+                                          final currentQty =
+                                              item["currentReceivedQuantity"] ??
+                                              0.0;
+                                          final maxQty =
+                                              item["RemainingOpenInventoryQuantity"] ??
+                                              0.0;
+                                          if (currentQty < maxQty) {
+                                            final newQty = (currentQty + 1)
+                                                .clamp(0.0, double.infinity);
+                                            controller.updatePoItemQuantity(
+                                              index,
+                                              newQty,
+                                            );
+                                            poItemQtyControllers[index].text =
+                                                newQty.toInt().toString();
+                                          }
+                                        },
+                                      ),
+                                      const Spacer(),
+                                      IconButton(
+                                        icon: const Icon(
+                                          Icons.clear,
+                                          color: Colors.red,
+                                        ),
+
+                                        onPressed: () {
+                                          controller.updatePoItemQuantity(
+                                            index,
+                                            0.0,
+                                          );
+                                          poItemQtyControllers[index].text =
+                                              "0";
+                                        },
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),
-                            ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGrGiForm(BuildContext context) {
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // === Form Cari GI ===
+            Card(
+              elevation: 3,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              color: Colors.white,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "Search Goods Issue",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: controller.grgiNumberController,
+                            decoration: InputDecoration(
+                              hintText: "Goods Issue Number",
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            keyboardType: TextInputType.number,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        ElevatedButton.icon(
+                          onPressed: controller.searchGrgi,
+                          icon: const Icon(Icons.search, color: Colors.blue),
+                          label: const Text(
+                            "Search",
+                            style: TextStyle(color: Colors.blue),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            side: BorderSide(
+                              color: Colors.blue.shade500,
+                              width: 2,
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            elevation: 0,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            Obx(() {
+              if (controller.goodsIssue.value == null) {
+                return const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.business_center, color: Colors.grey, size: 60),
+                      SizedBox(height: 10),
+                      Text(
+                        'Please search the goods issue number',
+                        style: TextStyle(color: Colors.grey, fontSize: 16),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              final po = controller.goodsIssue.value!;
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // === GI Info ===
+                  SizedBox(
+                    width: double.infinity,
+                    child: Card(
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      color: Colors.white,
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              "GI Details",
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text("Doc Number: ${po["docNum"]}"),
+                            Text(
+                              "From Warehouse: ${po["lines"] != null && po["lines"].isNotEmpty ? po["lines"][0]["WarehouseCode"] : ''}",
+                            ),
+
+                            Text(
+                              "Date: ${DateTime.parse(po["docDate"]).toLocal().toString().split(' ')[0]}",
+                            ),
+                            Text("Comments: ${po["comments"]}"),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // === Daftar Item ===
+                  const Text(
+                    "Items to Receive",
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 10),
+                  ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: controller.grgiItems.length,
+                    itemBuilder: (context, index) {
+                      final item = controller.grgiItems[index];
+
+                      return AnimatedOpacity(
+                        duration: const Duration(milliseconds: 500),
+                        opacity:
+                            (item["currentReceivedQuantity"] ?? 0.1) > 0
+                                ? 1.0
+                                : 0.0,
+                        child: IgnorePointer(
+                          ignoring:
+                              (item["currentReceivedQuantity"] ?? 0.1) <= 0,
+                          child: Visibility(
+                            visible: (item["currentReceivedQuantity"] ?? 0) > 0,
+                            child: Container(
+                              margin: const EdgeInsets.symmetric(vertical: 8),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.grey.shade300,
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // Nama Item
+                                    Text(
+                                      "${item["ItemDescription"]} (${item["ItemCode"]})",
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      "Bin Loc : ${item["BinLoc"]}",
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+
+                                    // Info Qty
+                                    Text(
+                                      "Qty Transfer: ${item["Quantity"]} | Received: ${item["ReceivedQuantity"] ?? 0} | Open: ${item["RemainingOpenQuantity"]}",
+                                      style: TextStyle(
+                                        color: Colors.grey.shade700,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 12),
+
+                                    // Input Quantity
+                                    Row(
+                                      children: [
+                                        IconButton(
+                                          icon: const Icon(
+                                            Icons.remove_circle_outline,
+                                            color: Colors.red,
+                                          ),
+                                          onPressed: () {
+                                            final currentQty =
+                                                item["currentReceivedQuantity"] ??
+                                                0.0;
+                                            if (currentQty > 0) {
+                                              final newQty = (currentQty - 1)
+                                                  .clamp(0.0, double.infinity);
+                                              controller.updateGrgiItemQuantity(
+                                                index,
+                                                newQty,
+                                              );
+                                              GIItemQtyControllers[index].text =
+                                                  newQty == 0.0
+                                                      ? ''
+                                                      : newQty
+                                                          .toInt()
+                                                          .toString();
+                                            }
+                                          },
+                                        ),
+                                        SizedBox(
+                                          width: 100,
+                                          height: 38,
+                                          child: TextField(
+                                            controller:
+                                                GIItemQtyControllers[index],
+                                            textAlign: TextAlign.center,
+                                            decoration: InputDecoration(
+                                              hintText: "0",
+                                              filled: true,
+                                              fillColor: Colors.white,
+                                              isDense: true,
+                                              contentPadding:
+                                                  const EdgeInsets.symmetric(
+                                                    vertical: 4,
+                                                  ),
+                                              border: OutlineInputBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                              ),
+                                            ),
+                                            keyboardType:
+                                                const TextInputType.numberWithOptions(
+                                                  decimal: false,
+                                                ),
+                                            onChanged: (value) {
+                                              controller.updateGrgiItemQuantity(
+                                                index,
+                                                double.tryParse(value) ?? 0.0,
+                                              );
+                                            },
+                                          ),
+                                        ),
+
+                                        IconButton(
+                                          icon: const Icon(
+                                            Icons.add_circle,
+                                            color: Colors.green,
+                                          ),
+
+                                          onPressed: () {
+                                            final currentQty =
+                                                item["currentReceivedQuantity"] ??
+                                                0.0;
+                                            final maxQty =
+                                                item["RemainingOpenQuantity"] ??
+                                                0.0;
+                                            if (currentQty < maxQty) {
+                                              final newQty = (currentQty + 1)
+                                                  .clamp(0.0, double.infinity);
+                                              controller.updateGrgiItemQuantity(
+                                                index,
+                                                newQty,
+                                              );
+                                              GIItemQtyControllers[index].text =
+                                                  newQty.toInt().toString();
+                                            }
+                                          },
+                                        ),
+                                        const Spacer(),
+                                        IconButton(
+                                          icon: const Icon(
+                                            Icons.clear,
+                                            color: Colors.red,
+                                          ),
+
+                                          onPressed: () {
+                                            controller.updateGrgiItemQuantity(
+                                              index,
+                                              0.0,
+                                            );
+                                            GIItemQtyControllers[index].text =
+                                                "0";
+                                          },
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
                           ),
                         ),
                       );
@@ -734,21 +1087,21 @@ void _syncQtyControllers() {
 
                         const SizedBox(height: 10),
                         TextField(
-                              controller: controller.nonPoQuantityController,
-                              decoration: InputDecoration(
-                                labelText: "Quantity",
-                                hintText: "Enter Quantity",
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                prefixIcon: const Icon(
-                                  Icons.production_quantity_limits,
-                                ),
-                              ),
-                              keyboardType: const TextInputType.numberWithOptions(
-                                decimal: false,
-                              ),
+                          controller: controller.nonPoQuantityController,
+                          decoration: InputDecoration(
+                            labelText: "Quantity",
+                            hintText: "Enter Quantity",
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
                             ),
+                            prefixIcon: const Icon(
+                              Icons.production_quantity_limits,
+                            ),
+                          ),
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: false,
+                          ),
+                        ),
                         const SizedBox(height: 10),
                         SizedBox(
                           width: double.infinity,
@@ -811,23 +1164,19 @@ void _syncQtyControllers() {
           Flexible(
             child: Obx(() {
               if (controller.nonPoItems.isEmpty) {
-                  return const Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.business_center,
-                          color: Colors.grey,
-                          size: 60,
-                        ),
-                        SizedBox(height: 10),
-                        Text(
-                          'No items added',
-                          style: TextStyle(color: Colors.grey, fontSize: 16),
-                        ),
-                      ],
-                    ),
-                  );
+                return const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.business_center, color: Colors.grey, size: 60),
+                      SizedBox(height: 10),
+                      Text(
+                        'No items added',
+                        style: TextStyle(color: Colors.grey, fontSize: 16),
+                      ),
+                    ],
+                  ),
+                );
 
                 // return const Center(
                 //   child: Text(
@@ -874,19 +1223,24 @@ void _syncQtyControllers() {
                                   //   );
                                   // }
                                   if (qty > 0) {
-                                      final newQty = (qty - 1).toDouble();
-                                      controller.updateNonPoItemQuantity(index, newQty);
+                                    final newQty = (qty - 1).toDouble();
+                                    controller.updateNonPoItemQuantity(
+                                      index,
+                                      newQty,
+                                    );
 
-                                      // ⬇️ update controller juga
-                                      _nonPoQtyControllers[index].text = newQty == 0 ? '' : newQty.toInt().toString();
-                                    }
+                                    // ⬇️ update controller juga
+                                    _nonPoQtyControllers[index].text =
+                                        newQty == 0
+                                            ? ''
+                                            : newQty.toInt().toString();
+                                  }
                                 },
                                 icon: const Icon(
                                   Icons.remove_circle,
                                   color: Colors.red,
                                 ),
                               ),
-                              
 
                               SizedBox(
                                 width: 100,
@@ -918,13 +1272,17 @@ void _syncQtyControllers() {
                                 ),
                               ),
                               IconButton(
-                                 onPressed: () {
+                                onPressed: () {
                                   final newQty = (qty + 1).toDouble();
-                                  controller.updateNonPoItemQuantity(index, newQty);
+                                  controller.updateNonPoItemQuantity(
+                                    index,
+                                    newQty,
+                                  );
 
-                                  _nonPoQtyControllers[index].text = newQty.toInt().toString();
+                                  _nonPoQtyControllers[index].text =
+                                      newQty.toInt().toString();
                                 },
-                                // onPressed: 
+                                // onPressed:
                                 //     () => controller.updateNonPoItemQuantity(
                                 //       index,
                                 //       (qty + 1).toDouble(),
@@ -940,13 +1298,13 @@ void _syncQtyControllers() {
                                   Icons.delete,
                                   color: Colors.red,
                                 ),
+
                                 // onPressed: () {
                                 //   controller.updateNonPoItemQuantity(index, 0);
                                 //   _nonPoQtyControllers[index].text = '';
                                 // },
-
-                                 onPressed:
-                                     () => controller.removeNonPoItem(index),
+                                onPressed:
+                                    () => controller.removeNonPoItem(index),
                               ),
                             ],
                           ),
