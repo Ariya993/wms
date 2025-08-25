@@ -8,7 +8,7 @@ final apiURL = isDev ? "$host/Sandbox_SAPDUMMY/api" : "$host/Sandbox_SAP/api";
 final apiURLWMS = isDev ? "$host/Sandbox_WMSDUMMY/api" : "$host/Sandbox_WMS/api";
 
 // final apiURL = isDev ? "$host/Sandbox_SAPDUMMY/api" : "$host/Sandbox_SAP/api";
-// final hostLocal = "http://192.168.16.13";
+// final hostLocal = "http://10.107.156.24";
 // final apiURLWMS = isDev ? "$hostLocal/Sandbox_WMS/api" : "$host/Sandbox_WMS/api";
 
 
@@ -21,10 +21,13 @@ final apiScanItem= "$apiURL/SAPItem/scan";
 final apiItemHeader= "$apiURL/SAPItem/header";
 final apiPO= "$apiURL/SAPPO";
 final apiGI= "$apiURL/SAPGI";
+final apiITR= "$apiURL/SAPITR"; 
 final apiPickPack= "$apiURL/SAPPickPack"; 
 final apiScanPickPack= "$apiURL/SAPPickPack/scan"; 
 final apiPickList= "$apiURL/SAPPickList"; 
+final apiOutstandingPickList= "$apiURL/SAPValidPickList/outstanding"; 
 final apiInventoryIn= "$apiURL/SAPInventoryIn"; 
+final apiStockOpname= "$apiURL/SAPOpname";
 
 
 
@@ -42,4 +45,6 @@ final apiBarcodeWMS= "$apiURLWMS/Barcode/QRHtml";
 final apiFCMToken= "$apiURLWMS/fcm/set"; 
 final apiSendFCM= "$apiURLWMS/fcm/sendByUser";
  final apiTestConn= "$apiURLWMS/auth/protected"; 
+ final apiStockOpnameWMS= "$apiURLWMS/wms_user_opname";
  final apiVersionWMS= "$apiURLWMS/WMSKonfigurasi/version"; 
+ final apiIssueTypeWMS= "$apiURLWMS/WMSIssueType"; 

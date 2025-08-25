@@ -8,7 +8,7 @@ import '../services/api_service.dart';
 import '../services/sap_service.dart';
 import 'item_controller.dart';
 
-class PicklistController extends GetxController {
+class ListOpnameController extends GetxController {
   final SAPService _sapB1Service = Get.find<SAPService>();
   final ApiService _apiService = Get.find<ApiService>();
   final ItemController itemcontroller = Get.find<ItemController>();
@@ -43,7 +43,7 @@ class PicklistController extends GetxController {
     scrollController.addListener(() {
       if (scrollController.position.pixels >=
           scrollController.position.maxScrollExtent - 100) {
-        fetchPickList();
+        fetchList();
       }
     });
   }
@@ -60,7 +60,7 @@ class PicklistController extends GetxController {
     ever(_allPicklists, (_) => _filterPicklists());
     ever(selectedStatusFilter, (_) => _filterPicklists());
 
-    await fetchPickList(reset: true);
+    await fetchList(reset: true);
     await fetchOutstandingPicklist();
     _filterPicklists();
     // langsung panggil filter di awal
@@ -72,7 +72,7 @@ class PicklistController extends GetxController {
       final fetchedPicker = await _sapB1Service.getOutstandingPickList();
 
       outstandingPickList.value = fetchedPicker;
-      //print(outstandingPickList);
+      print(outstandingPickList);
     } catch (e) {
       Get.snackbar(
         "Error",
@@ -112,7 +112,7 @@ class PicklistController extends GetxController {
   }
 
   @override
-  Future<void> fetchPickList({
+  Future<void> fetchList({
     bool reset = false,
     String? source,
     String? warehouse,
@@ -138,19 +138,13 @@ class PicklistController extends GetxController {
     // print(selectedStatusFilter.value);
     // print(mWarehouse);
     try {
-      final List<Map<String, dynamic>> pickpack = await _sapB1Service
-          .getPickList(
-            _page * 20,
-            source ?? selectedStatusFilter.value,
-            searchQuery.value,
-            warehouse,
-          );
-      // print(pickpack);
+      final List<Map<String, dynamic>> pickpack = await _apiService.fetchListOpname(warehouse:mWarehouse);
+      
       if (pickpack.isEmpty) {
         hasMoreData.value = false;
       } else {
         _page++;
-        // pickpack.sort((a, b) {
+        //   pickpack.sort((a, b) {
         //   final binA = (a["BinLoc"] ?? "").toString();
         //   final binB = (b["BinLoc"] ?? "").toString();
         //   return binA.compareTo(binB);
@@ -163,10 +157,10 @@ class PicklistController extends GetxController {
         _filterPicklists();
       }
     } catch (e) {
-      errorMessage.value = 'Failed to fetch pickable items: $e';
+      errorMessage.value = 'Failed to fetch list opname items: $e';
       Get.snackbar(
         "Error",
-        "Gagal memuat picklist: ${e.toString()}",
+        "Gagal memuat list opname: ${e.toString()}",
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
@@ -182,7 +176,7 @@ class PicklistController extends GetxController {
     } else {
       displayedPicklists.value =
           _allPicklists
-              .where((pl) => pl['Status'] == selectedStatusFilter.value)
+              .where((pl) => pl['status'] == selectedStatusFilter.value)
               .toList();
     }
   }
@@ -230,27 +224,20 @@ class PicklistController extends GetxController {
     if (currentProcessingPicklist.value == null) return;
 
     final List<dynamic> lines =
-        currentProcessingPicklist.value!['DocumentLine'];
+        currentProcessingPicklist.value!['InventoryCountingLines'];
 
     if (lineIndex >= 0 && lineIndex < lines.length) {
       final lineToUpdate = lines[lineIndex];
 
       final double pickedQty =
-          lineToUpdate['PickedQuantity']?.toDouble() ?? 0.0;
+          lineToUpdate['CountedQuantity']?.toDouble() ?? 0.0;
       final double releasedQty =
-          lineToUpdate['ReleasedQuantity']?.toDouble() ?? 0.0;
+          lineToUpdate['InWarehouseQuantity']?.toDouble() ?? 0.0;
       final double stockOnHand =
           double.tryParse(lineToUpdate['StockOnHand']?.toString() ?? '0.0') ??
           0.0;
 
-      double finalQty = newQty;
-      // final double allowedMax = releasedQty - pickedQty;
-
-      //  if (finalQty > allowedMax) {
-      //     finalQty = allowedMax;
-      //     Get.snackbar('Warning','Picked quantity cannot exceed released quantity.',
-      //         backgroundColor: Colors.orange, colorText: Colors.white);
-      //   }
+      double finalQty = newQty; 
 
       if (finalQty < 0) finalQty = 0;
       if (finalQty > releasedQty) {
@@ -348,7 +335,7 @@ class PicklistController extends GetxController {
 
       // targetLine['PickedQuantity'] = currentPickedQty + 1.0;
       final double combined = alreadyPicked + newPicked + 1.0;
-
+      //print(combined);
       if (combined > releasedQty) {
         Get.snackbar(
           'Warning',
@@ -392,132 +379,6 @@ class PicklistController extends GetxController {
     }
   }
 
-  // --- Metode completePicklist (Sama seperti sebelumnya) ---
-  Future<void> completePicklist() async {
-    if (currentProcessingPicklist.value == null) {
-      Get.snackbar(
-        'Error',
-        'No picklist selected to complete.',
-        backgroundColor: Colors.redAccent,
-        colorText: Colors.white,
-      );
-      return;
-    }
-
-    isLoading.value = true;
-    errorMessage.value = '';
-    try {
-      final picklist = currentProcessingPicklist.value!;
-      final warehouse = picklist["DocumentLine"][0]["WarehouseCode"];
-
-      final Map<String, dynamic> dataToUpdate = {
-        "PickListsLines":
-            picklist["DocumentLine"].map((line) {
-              // final pickedQty = line["PickedQuantity"]?.toDouble() ?? 0.0;
-              if (!line.containsKey("NewPickedQty")) {
-                Get.snackbar(
-                  "Failed",
-                  "Not all items has been scanned",
-                  backgroundColor: Colors.red,
-                  colorText: Colors.white,
-                );
-                return false;
-              }
-
-              final releasedQty = line["ReleasedQuantity"]?.toDouble() ?? 0.0;
-              final orderdQty =
-                  line["PreviouslyReleasedQuantity"]?.toDouble() ?? 0.0;
-
-              final double pickedQtyBefore =
-                  line["PickedQuantity"]?.toDouble() ?? 0.0;
-              final double newPicked = line["NewPickedQty"]?.toDouble() ?? 0.0;
-
-              if (newPicked > releasedQty) {
-                Get.snackbar(
-                  "Failed",
-                  "Picked quantity cannot be greater than released quantity",
-                  backgroundColor: Colors.red,
-                  colorText: Colors.white,
-                );
-                return false;
-                // throw Exception(
-                //     "Picked quantity (${newPicked.toStringAsFixed(0)}) cannot be greater than released quantity (${releasedQty.toStringAsFixed(0)})");
-              } else if (newPicked < releasedQty) {
-                Get.snackbar(
-                  "Failed",
-                  "Picked quantity must be equals than quantity",
-                  backgroundColor: Colors.red,
-                  colorText: Colors.white,
-                );
-                return false;
-                // throw Exception(
-                //     "Picked quantity (${newPicked.toStringAsFixed(0)}) cannot be greater than released quantity (${releasedQty.toStringAsFixed(0)})");
-              }
-
-              final double finalPickedQty = pickedQtyBefore + newPicked;
-
-              final double sendQty =
-                  line["NewPickedQty"]?.toDouble() ??
-                  (line["PickedQuantity"]?.toDouble() ?? 0.0);
-
-              return {
-                "LineNumber": line["LineNumber"],
-                "PickedQuantity": finalPickedQty,
-              };
-            }).toList(),
-      };
-
-      final rslt = await _sapB1Service.updatePickList(
-        dataToUpdate,
-        picklist["Absoluteentry"].toString(),
-        warehouse,
-      );
-      if (rslt == '') {
-        for (var line in picklist["DocumentLine"]) {
-          line.remove('NewPickedQty');
-        }
-        String plaform = '';
-        String atasan = box.read('atasan');
-        String user = box.read('username');
-        await _apiService.SendFCM(
-          atasan,
-          plaform,
-          'WMS Apps',
-          '$user - Pick List has been completed',
-          '/wms/#/pickpack',
-        );
-        await Future.delayed(const Duration(seconds: 1));
-
-        Get.snackbar(
-          "Success",
-          "Picklist Submitted",
-          backgroundColor: Colors.green,
-          colorText: Colors.white,
-        );
-      //  await  fetchPickList(reset: true);
-      Get.delete<PicklistController>();
-        Get.toNamed('/picklist');
-
-        //  Get.toNamed('/picklist')?.then((_) {
-        //   fetchPickList(reset: true);
-        // });
-
-        // Get.back();
-      }
-    } catch (e) {
-      errorMessage.value = 'Failed to update picklist: ${e.toString()}';
-      Get.snackbar(
-        'Error',
-        errorMessage.value,
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.redAccent,
-        colorText: Colors.white,
-      );
-    } finally {
-      isLoading.value = false;
-    }
-  }
-
   Future<void> openPicklist() async {
     if (currentProcessingPicklist.value == null) {
       Get.snackbar(
@@ -552,7 +413,7 @@ class PicklistController extends GetxController {
 
       final rslt = await _sapB1Service.updatePickList(
         dataToUpdate,
-        picklist["Absoluteentry"].toString(),
+        picklist["Absoluteentry"],
         warehouse,
       );
       if (rslt == '') {
@@ -574,11 +435,8 @@ class PicklistController extends GetxController {
           backgroundColor: Colors.green,
           colorText: Colors.white,
         );
-       // await fetchPickList(reset: true);
-        // Get.offAllNamed('/picklist');
-        Get.delete<PicklistController>();
-       Get.toNamed('/picklist');
-
+       // fetchPickList(reset: true);
+        Get.offAllNamed('/picklist');
       } else {
         errorMessage.value = "Failed";
         Get.snackbar(
@@ -620,7 +478,7 @@ class PicklistController extends GetxController {
         "Name": pickerName,
         "Remarks": note,
       };
-      //print('Picker value : ${selectedPicker.value?['username']}');
+      print('Picker value : ${selectedPicker.value?['username']}');
       final createdPickList = await _sapB1Service.updatePickList(
         newPickListPayload,
         id_picklist.toString(),
@@ -642,8 +500,9 @@ class PicklistController extends GetxController {
           backgroundColor: Colors.green,
           colorText: Colors.white,
         );
-        fetchPickList(reset: true);
-        // Refresh list setelah Pick List berhasil dibuat
+        // fetchPickList(
+        //   reset: true,
+        // ); // Refresh list setelah Pick List berhasil dibuat
       } else {
         errorMessage.value = createdPickList; // Gunakan pesan error dari API
         Get.snackbar(
@@ -663,13 +522,14 @@ class PicklistController extends GetxController {
         colorText: Colors.white,
         duration: const Duration(seconds: 5),
       );
-      //  print(errorMessage.value);
+      print(errorMessage.value);
     } finally {
       isLoading.value = false;
     }
   }
 
   Future<void> cancelPickList(int id_picklist) async {
+    
     isLoading.value = true;
     errorMessage.value = '';
     //(warehouse);
@@ -698,10 +558,7 @@ class PicklistController extends GetxController {
         );
         // fetchPickList(
         //   reset: true,
-        // );
-        Get.toNamed('/picklist')?.then((_) {
-          fetchPickList(reset: true);
-        });
+        // ); // Refresh list setelah Pick List berhasil dibuat
       } else {
         errorMessage.value = createdPickList; // Gunakan pesan error dari API
         Get.snackbar(
@@ -721,9 +578,77 @@ class PicklistController extends GetxController {
         colorText: Colors.white,
         duration: const Duration(seconds: 5),
       );
-      //print(errorMessage.value);
+      print(errorMessage.value);
     } finally {
       isLoading.value = false;
     }
   }
+
+
+
+  Future<void> ProsesStockOpname({
+    required DateTime pickDate,
+    required String pickerName,
+    String? note,
+    String? warehouse,
+    int? docEntry,
+    int? docNum,
+    int? items,
+  }) async {
+    isLoading.value = true;
+
+    //(warehouse);
+    try {
+      if (warehouse == '') {
+        warehouse = box.read('warehouse_code');
+      }
+
+      if (pickerName == '') {
+        Get.snackbar(
+          "Failed",
+          "Please select picker name",
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+        return;
+      }
+
+      final Map<String, dynamic> newPickListPayload = {
+        "docDate": pickDate.toIso8601String(),
+        "pickerName": pickerName,
+        "remarks": note,
+        "warehouse_code": warehouse,
+        "docEntry": docEntry,
+        "docNum": docNum,
+        "items": items,
+        "status": 'R',
+        "user_proses": box.read('username') ?? '',
+      };
+      // print('Picker value : ${selectedPicker.value?['username']}');
+      final created = await _apiService.postStockOpname(newPickListPayload);
+      if (created) {
+        String platform = '';
+
+        await _apiService.SendFCM(
+          selectedPicker.value?['username'],
+          platform,
+          'WMS Apps',
+          'You have a new task for stock opname',
+          '/wms/#/list-opname',
+        ); 
+      } 
+    } catch (e) {
+      Get.snackbar(
+        "Error",
+        'Terjadi kesalahan saat proses stock opname : ${e.toString()}',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 5),
+      );
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+
 }

@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:wms/controllers/item_controller.dart';
+import 'package:wms/pages/opname_detail_page.dart';
 
+import '../controllers/list_opname_controller.dart';
 import '../controllers/picklist_controller.dart';
 import '../helper/format.dart';
 import '../widgets/custom_dropdown_search.dart';
@@ -11,37 +13,25 @@ import '../widgets/loading.dart';
 import '../widgets/statusbadge.dart';
 import 'picklist_detail_page.dart';
 
-class PicklistsPage extends StatefulWidget {
-  const PicklistsPage({super.key});
+class ListOpnamePage extends StatefulWidget {
+  const ListOpnamePage({super.key});
 
   @override
-  State<PicklistsPage> createState() => _PicklistsPageState();
+  State<ListOpnamePage> createState() => _ListOpnamePageState();
 }
 
-class _PicklistsPageState extends State<PicklistsPage> {
+class _ListOpnamePageState extends State<ListOpnamePage> {
   // const PicklistsPage({super.key});
-  late final PicklistController controller = Get.put(PicklistController());
+  late final ListOpnameController controller = Get.put(ListOpnameController());
   late final ItemController itemController = Get.put(ItemController());
-  @override
-  void initState() {
-    super.initState();
-    controller.fetchPickList(reset: true);
-  }
- 
-  // @override
-  // void dispose() {
-  //   scrollController.dispose();
-  //   searchController.dispose();
-  //   debounceTimer?.cancel();
-  //   super.dispose();
-  // }
 
+  
   @override
   Widget build(BuildContext context) {
     final ColorScheme colorScheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Pick List Manager'),
+        title: const Text('List Stock Opname'),
         actions: [
           Obx(
             () => PopupMenuButton<String>(
@@ -57,7 +47,7 @@ class _PicklistsPageState extends State<PicklistsPage> {
                     ),
                     const PopupMenuItem<String>(
                       value: 'Y',
-                      child: Text('Closed (Picked)'),
+                      child: Text('Closed (Compelete)'),
                     ),
                   ],
               child: Padding(
@@ -84,8 +74,8 @@ class _PicklistsPageState extends State<PicklistsPage> {
           ),
           IconButton(
             icon: Icon(Icons.refresh, color: colorScheme.onPrimary),
-            tooltip: 'Refresh Picklists',
-            onPressed: () => controller.fetchPickList(reset: true),
+            tooltip: 'Refresh Data',
+            onPressed: () => controller.fetchList(reset: true),
           ),
         ],
         elevation: 2,
@@ -112,7 +102,7 @@ class _PicklistsPageState extends State<PicklistsPage> {
                   ),
                   const SizedBox(height: 24),
                   ElevatedButton.icon(
-                    onPressed: () => controller.fetchPickList(),
+                    onPressed: () => controller.fetchList(),
                     icon: const Icon(Icons.replay),
                     label: const Text('Try Again'),
                     style: ElevatedButton.styleFrom(
@@ -137,8 +127,7 @@ class _PicklistsPageState extends State<PicklistsPage> {
         return Column(
           children: [
             Padding(
-              padding: const EdgeInsets.only(top: 8.0, right: 16.0),
-              // padding: const EdgeInsets.only(right: 16.0), // tambahkan ini
+              padding: const EdgeInsets.only(top: 8.0, right: 16.0), 
               child: Align(
                 alignment: Alignment.centerRight,
 
@@ -213,7 +202,7 @@ class _PicklistsPageState extends State<PicklistsPage> {
                                                   itemController
                                                       .selectedWarehouseFilter
                                                       .value = w;
-                                                  controller.fetchPickList(
+                                                  controller.fetchList(
                                                     reset: true,
                                                     source:
                                                         controller
@@ -283,7 +272,7 @@ class _PicklistsPageState extends State<PicklistsPage> {
                       ),
                       const SizedBox(height: 24),
                       Text(
-                        'No picklists found for ${controller.selectedStatusFilter.value == 'R' ? 'Released' : 'Closed'} status.',
+                        'No data found for ${controller.selectedStatusFilter.value == 'R' ? 'Released' : 'Closed'} status.',
                         style: TextStyle(color: Colors.grey[600], fontSize: 18),
                         textAlign: TextAlign.center,
                       ),
@@ -344,7 +333,7 @@ class _PicklistsPageState extends State<PicklistsPage> {
                               Expanded(
                                 flex: 2,
                                 child: Text(
-                                  'Pick Date',
+                                  'Doc Date',
                                   style: TextStyle(fontWeight: FontWeight.bold),
                                 ),
                               ),
@@ -372,7 +361,7 @@ class _PicklistsPageState extends State<PicklistsPage> {
                       final actualIndex = index - 1; // <— penting
                       final picklist =
                           controller.displayedPicklists[actualIndex];
-                      final bool isViewOnly = picklist['Status'] == 'Y';
+                      final bool isViewOnly = picklist['status'] == 'Y';
 
                       return MouseRegion(
                         cursor: SystemMouseCursors.click,
@@ -382,8 +371,13 @@ class _PicklistsPageState extends State<PicklistsPage> {
                                 .currentProcessingPicklist
                                 .value = Map<String, dynamic>.from(picklist);
                             Get.to(
-                              () => PicklistDetailPage(isViewOnly: isViewOnly),
+                              () => OpnameDetailPage(
+                                isViewOnly: isViewOnly,
+                                docEntry: picklist['docEntry'],
+                              ),
+                              preventDuplicates: false,
                             );
+
                           },
                           child: Container(
                             padding: const EdgeInsets.symmetric(
@@ -408,7 +402,7 @@ class _PicklistsPageState extends State<PicklistsPage> {
                                 Expanded(
                                   flex: 2,
                                   child: Text(
-                                    picklist['Name'] ?? 'No Name',
+                                    picklist['pickerName'] ?? 'No Name',
                                     style: const TextStyle(
                                       fontWeight: FontWeight.w600,
                                       fontSize: 14,
@@ -419,7 +413,7 @@ class _PicklistsPageState extends State<PicklistsPage> {
                                 Expanded(
                                   flex: 1,
                                   child: Text(
-                                    '${(picklist['DocumentLine'] as List).length}',
+                                    '${picklist['items']}',
                                     style: const TextStyle(
                                       fontSize: 13,
                                       color: Colors.black87,
@@ -430,7 +424,7 @@ class _PicklistsPageState extends State<PicklistsPage> {
                                 Expanded(
                                   flex: 2,
                                   child: Text(
-                                    format.formatPickDate(picklist['PickDate']),
+                                    format.formatPickDate(picklist['docDate']),
                                     style: const TextStyle(
                                       fontSize: 13,
                                       color: Colors.black87,
@@ -440,7 +434,7 @@ class _PicklistsPageState extends State<PicklistsPage> {
                                 Expanded(
                                   flex: 3,
                                   child: Text(
-                                    picklist['Remarks'] ?? '-',
+                                    picklist['remarks'] ?? '-',
                                     style: const TextStyle(
                                       fontSize: 13,
                                       color: Colors.black54,
@@ -478,7 +472,13 @@ class _PicklistsPageState extends State<PicklistsPage> {
                                         context,
                                         controller
                                             .currentProcessingPicklist
-                                            .value!['Absoluteentry'],
+                                            .value!['docEntry'],
+                                            controller
+                                              .currentProcessingPicklist
+                                              .value!['docNum'],
+                                          controller
+                                              .currentProcessingPicklist
+                                              .value!['items'], 
                                       );
                                       // controller.currentProcessingPicklist.value =
                                       //     Map<String, dynamic>.from(picklist);
@@ -532,7 +532,7 @@ class _PicklistsPageState extends State<PicklistsPage> {
 
                     // ===== MOBILE VIEW (tetap seperti sebelumnya) =====
                     final picklist = controller.displayedPicklists[index];
-                    final bool isViewOnly = picklist['Status'] == 'Y';
+                    final bool isViewOnly = picklist['status'] == 'Y';
 
                     return Card(
                       color: Colors.white,
@@ -554,66 +554,88 @@ class _PicklistsPageState extends State<PicklistsPage> {
                               .currentProcessingPicklist
                               .value = Map<String, dynamic>.from(picklist);
                           Get.to(
-                            () => PicklistDetailPage(isViewOnly: isViewOnly),
+                            () => OpnameDetailPage(
+                              isViewOnly: isViewOnly,
+                              docEntry: picklist['docEntry'],
+                            ),
+                            preventDuplicates: false,
                           );
+
                         },
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Padding(
-                              padding: const EdgeInsets.all(16),
-                              // padding: const EdgeInsets.symmetric(
-                              //   horizontal: 20,
-                              //   vertical: 16,
-                              // ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 16,
+                              ),
                               child: 
-                             Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      // Row: Name + Badge
-      Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              Row(
+  crossAxisAlignment: CrossAxisAlignment.start,
+  children: [
+    Icon(
+      isViewOnly ? Icons.lock_outline : Icons.playlist_add_check,
+      color: isViewOnly ? colorScheme.error : colorScheme.primary,
+      size: 30,
+    ),
+    const SizedBox(width: 16),
+    Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Text(
-              picklist['Name'] ?? 'No Name',
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 18,
-                color: colorScheme.onSurface,
+          // 🔹 Picker name + Badge sejajar
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  picklist['pickerName'] ?? 'No Name',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 18,
+                    color: colorScheme.onSurface,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-              overflow: TextOverflow.ellipsis,
-            ),
+              const SizedBox(width: 8),
+              StatusBadge(
+                text: isViewOnly ? 'Closed' : 'Released',
+                backgroundColor: isViewOnly
+                    ? Colors.red.shade100
+                    : Colors.blue.shade100,
+                textColor: isViewOnly
+                    ? Colors.red.shade600
+                    : Colors.blue.shade600,
+                icon: isViewOnly
+                    ? Icons.lock_outline
+                    : Icons.check_circle_outline,
+              ),
+            ],
           ),
-          StatusBadge(
-            text: isViewOnly ? 'Closed' : 'Released',
-            backgroundColor:
-                isViewOnly ? Colors.red.shade100 : Colors.blue.shade100,
-            textColor:
-                isViewOnly ? Colors.red.shade600 : Colors.blue.shade600,
-            icon: isViewOnly
-                ? Icons.lock_outline
-                : Icons.check_circle_outline,
+          const SizedBox(height: 6),
+
+          // 🔹 Detail info
+          Text(
+            'Total Items: ${picklist['items']}',
+            style: TextStyle(color: Colors.grey[700], fontSize: 14),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Doc Date: ${format.formatPickDate(picklist['docDate'])}',
+            style: TextStyle(color: Colors.grey[700], fontSize: 14),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Remarks: ${picklist['remarks'] ?? '-'}',
+            style: TextStyle(color: Colors.grey[700], fontSize: 14),
           ),
         ],
       ),
-      const SizedBox(height: 6),
-
-      // Detail info
-      Text(
-        'Total Items: ${(picklist['DocumentLine'] as List).length}',
-        style: TextStyle(color: Colors.grey[700], fontSize: 14),
-      ),
-      Text(
-        'Pick Date: ${format.formatPickDate(picklist['PickDate'])}',
-        style: TextStyle(color: Colors.grey[700], fontSize: 14),
-      ),
-      Text(
-        'Remarks: ${picklist['Remarks'] ?? '-'}',
-        style: TextStyle(color: Colors.grey[700], fontSize: 14),
-      ),
-    ],
-  ),
+    ),
+  ],
+),
                               // Row(
                               //   crossAxisAlignment: CrossAxisAlignment.start,
                               //   children: [
@@ -634,7 +656,7 @@ class _PicklistsPageState extends State<PicklistsPage> {
                               //             CrossAxisAlignment.start,
                               //         children: [
                               //           Text(
-                              //             picklist['Name'] ?? 'No Name',
+                              //             picklist['pickerName'] ?? 'No Name',
                               //             style: TextStyle(
                               //               fontWeight: FontWeight.w600,
                               //               fontSize: 18,
@@ -643,7 +665,7 @@ class _PicklistsPageState extends State<PicklistsPage> {
                               //           ),
                               //           const SizedBox(height: 6),
                               //           Text(
-                              //             'Total Items: ${(picklist['DocumentLine'] as List).length}',
+                              //             'Total Items: ${picklist['items']}',
                               //             style: TextStyle(
                               //               color: Colors.grey[700],
                               //               fontSize: 14,
@@ -651,7 +673,7 @@ class _PicklistsPageState extends State<PicklistsPage> {
                               //           ),
                               //           const SizedBox(height: 4),
                               //           Text(
-                              //             'Pick Date: ${format.formatPickDate(picklist['PickDate'])}',
+                              //             'Doc Date: ${format.formatPickDate(picklist['docDate'])}',
                               //             style: TextStyle(
                               //               color: Colors.grey[700],
                               //               fontSize: 14,
@@ -659,7 +681,7 @@ class _PicklistsPageState extends State<PicklistsPage> {
                               //           ),
                               //           const SizedBox(height: 4),
                               //           Text(
-                              //             'Remarks: ${picklist['Remarks'] ?? '-'}',
+                              //             'Remarks: ${picklist['remarks'] ?? '-'}',
                               //             style: TextStyle(
                               //               color: Colors.grey[700],
                               //               fontSize: 14,
@@ -718,7 +740,13 @@ class _PicklistsPageState extends State<PicklistsPage> {
                                           context,
                                           controller
                                               .currentProcessingPicklist
-                                              .value!['Absoluteentry'],
+                                              .value!['docEntry'],
+                                          controller
+                                              .currentProcessingPicklist
+                                              .value!['docNum'],
+                                          controller
+                                              .currentProcessingPicklist
+                                              .value!['items'], 
                                         );
                                       },
                                       icon: const Icon(Icons.edit, size: 16),
@@ -812,7 +840,7 @@ class _PicklistsPageState extends State<PicklistsPage> {
       itemController.selectedWarehouses,
     );
 
-    final controller = PicklistController();
+    final controller = ListOpnameController();
     showDialog(
       context: context,
       barrierColor: Colors.white,
@@ -846,7 +874,7 @@ class _PicklistsPageState extends State<PicklistsPage> {
                           ),
                         ),
                         onChanged:
-                            (value) => controller.fetchPickList(
+                            (value) => controller.fetchList(
                               reset: true,
                               source: controller.searchQuery.value,
                               warehouse: value,
@@ -868,7 +896,7 @@ class _PicklistsPageState extends State<PicklistsPage> {
                                 onTap: () {
                                   itemController.selectedWarehouseFilter.value =
                                       w;
-                                  controller.fetchPickList(
+                                  controller.fetchList(
                                     reset: true,
                                     source: controller.searchQuery.value,
                                     warehouse: w,
@@ -913,9 +941,9 @@ class _PicklistsPageState extends State<PicklistsPage> {
   }
 }
 
-void showPickListDialog(BuildContext context, int id_picklist) {
+void showPickListDialog(BuildContext context, int id_picklist, int docNum, int items) {
   final _formKey = GlobalKey<FormState>();
-  final controller = Get.find<PicklistController>();
+  final controller = Get.find<ListOpnameController>();
   final tempNote = TextEditingController();
   Rx<DateTime> selectedDate = DateTime.now().obs;
 
@@ -937,7 +965,7 @@ void showPickListDialog(BuildContext context, int id_picklist) {
                   children: [
                     // Title
                     const Text(
-                      'Detail Pick List',
+                      'Detail',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
@@ -1043,7 +1071,7 @@ void showPickListDialog(BuildContext context, int id_picklist) {
                           onPressed: () {
                             if (_formKey.currentState!.validate()) {
                               Navigator.pop(context);
-                              controller.updatePickList(
+                              controller.ProsesStockOpname(
                                 pickDate: selectedDate.value,
                                 pickerName:
                                     controller.selectedPicker.value?['nama'] ??
@@ -1053,7 +1081,9 @@ void showPickListDialog(BuildContext context, int id_picklist) {
                                     ItemController()
                                         .selectedWarehouseFilter
                                         .value,
-                                id_picklist: id_picklist,
+                                docEntry: id_picklist,
+                                docNum: docNum,
+                                items : items
                               );
                             }
                           },

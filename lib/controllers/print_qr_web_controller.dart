@@ -17,20 +17,20 @@ class PrintQRController {
   final labelHeight = box.read('label_height');
    
 
-  print("Label width: $labelWidth, height: $labelHeight");
+ // print("Label width: $labelWidth, height: $labelHeight");
 
   if (labelWidth == null || labelHeight == null) {
-    print("Label size tidak valid, pastikan sudah diset di GetStorage");
+   // print("Label size tidak valid, pastikan sudah diset di GetStorage");
     return;
   }
    final double? labelWidthRaw = double.tryParse(labelWidth.toString());
   final double? labelHeightRaw = double.tryParse(labelHeight.toString());
   if (labelWidthRaw == null || labelHeightRaw == null) {
-    print("Gagal parsing ukuran label");
+   // print("Gagal parsing ukuran label");
     return;
   }
   final pdf = pw.Document();
-  print('Image bytes length: ${imageBytes.length}');
+ // print('Image bytes length: ${imageBytes.length}');
 
   final image = pw.MemoryImage(imageBytes);
 pdf.addPage(
@@ -66,10 +66,10 @@ pdf.addPage(
   //   ),
   // );
 
-  print("Membuka dialog print...");
+ // print("Membuka dialog print...");
   await Printing.layoutPdf(
     onLayout: (PdfPageFormat format) async {
-      print("onLayout triggered...");
+     // print("onLayout triggered...");
       return pdf.save();
     },
   );

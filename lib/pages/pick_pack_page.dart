@@ -22,7 +22,7 @@ class _PickPackManagerPageState extends State<PickPackManagerPage> {
   late final ItemController itemController;
   late final ScrollController scrollController;
   late final TextEditingController searchController;
-
+ 
   void initState() {
     super.initState();
     controller = Get.find<PickPackController>();
@@ -55,6 +55,9 @@ class _PickPackManagerPageState extends State<PickPackManagerPage> {
     scrollController.dispose();
     searchController.dispose();
     debounceTimer?.cancel();
+     if (Get.isRegistered<PickPackController>()) {
+      Get.delete<PickPackController>();
+    }
     super.dispose();
   }
 
@@ -73,38 +76,27 @@ class _PickPackManagerPageState extends State<PickPackManagerPage> {
 
   @override
   Widget build(BuildContext context) {
-    // final ScrollController scrollController = ScrollController();
-    // final ItemController itemController = Get.put(ItemController());
-    // final TextEditingController searchController = TextEditingController(
-    //   text: controller.searchQuery.value,
-    // );
-
-    // Future<void> _navigateToScanner() async {
-    //   final result = await Get.to(() => const BarcodeScannerPage());
-    //   if (result != null && result is String && result.isNotEmpty) {
-    //     // print(result);
-    //     controller.searchQuery.value = result;
-    //     searchController.text=result;
-    //     controller.scanPickableItems(
-    //       reset: true,
-    //       source: controller.filterType.value,
-    //       warehouse: itemController.selectedWarehouseFilter.value,
-    //     );
-    //   }
-    // }
-    // scrollController.addListener(() {
-    //   if (scrollController.position.pixels >=
-    //           scrollController.position.maxScrollExtent - 200 ) {
-    //     controller.fetchPickableItems();
-    //   }
-    // });
-
-    return Scaffold(
+    
+     return WillPopScope(
+      onWillPop: () async {
+        if (Get.isRegistered<PickPackController>()) {
+          Get.delete<PickPackController>();
+        }
+        return true;
+      },
+      child: Scaffold(
       appBar: AppBar(
         title: const Text(
           'Pick & Pack Manager',
           style: TextStyle(color: Colors.white),
         ),
+        // leading: IconButton(
+        //   icon: const Icon(Icons.arrow_back_ios),
+        //   onPressed: () {
+        //     Get.delete<PickPackController>(); // hapus controller biar fresh
+        //     Get.back();
+        //   },
+        // ),
         iconTheme: const IconThemeData(color: Colors.white),
         backgroundColor: Colors.blue.shade700,
         elevation: 4,
@@ -557,7 +549,7 @@ class _PickPackManagerPageState extends State<PickPackManagerPage> {
                                     children: [
                                       Text('ORDER NO: ${item.docNum}'),
                                       Text(
-                                        item.cardName.toString(),
+                                        item.cardName??'',
                                         style: const TextStyle(fontSize: 11),
                                       ),
                                     ],
@@ -913,7 +905,7 @@ class _PickPackManagerPageState extends State<PickPackManagerPage> {
                                               MainAxisAlignment.spaceBetween,
                                           children: [
                                             Text(
-                                              '${item.cardName}',
+                                              item.cardName?? '' ,
                                               style: TextStyle(
                                                 fontSize: 12,
                                                 color: Colors.grey[600],
@@ -1187,6 +1179,7 @@ class _PickPackManagerPageState extends State<PickPackManagerPage> {
           ],
         );
       }),
+      ),
     );
   }
 
@@ -1246,7 +1239,15 @@ class _PickPackManagerPageState extends State<PickPackManagerPage> {
                         onChanged: (picker) {
                           controller.selectedPicker.value = picker;
                         },
-                        itemAsString: (picker) => picker['nama'] ?? '',
+                       itemAsString: (picker) {
+                        final nama = picker['nama'] ?? ''; 
+                          final outstanding=   controller.outstandingPickList
+                            .firstWhere(
+                              (o) => o['Name'].toString().toLowerCase() == nama.toString().toLowerCase(),
+                              orElse: () => {"Count": 0},
+                            )['Count'];
+                        return "$nama (Outstanding : ${outstanding ?? 0})";
+                      },
                         compareFn: (a, b) => a['UserCode'] == b['UserCode'],
                         validator:
                             (picker) =>

@@ -122,9 +122,9 @@ List<TextEditingController> poItemQtyControllers = [];
     _tabController = TabController(
       length: 3,
       vsync: this,
-      initialIndex: controller.currentMode.value == StockInMode.poBased ? 0 : 
-                 controller.currentMode.value == StockInMode.nonPo ? 1 : 2,
-      // initialIndex: controller.currentMode.value == StockInMode.poBased ? 0 : 1,
+      // initialIndex: controller.currentMode.value == StockInMode.poBased ? 0 : 
+      //            controller.currentMode.value == StockInMode.nonPo ? 1 : 2,
+      // // initialIndex: controller.currentMode.value == StockInMode.poBased ? 0 : 1,
     );
 
     // _tabController.addListener(() {
@@ -135,16 +135,16 @@ List<TextEditingController> poItemQtyControllers = [];
     //     controller.setMode(StockInMode.nonPo);
     //   }
     // });
-    _tabController.addListener(() {
-    if (_tabController.indexIsChanging) return;
-    if (_tabController.index == 0) {
-      controller.setMode(StockInMode.poBased);
-    } else if (_tabController.index == 1) {
-      controller.setMode(StockInMode.nonPo);
-    } else {
-      controller.setMode(StockInMode.grgi); // Tambah mode baru
-    }
-  });
+  //   _tabController.addListener(() {
+  //   if (_tabController.indexIsChanging) return;
+  //   if (_tabController.index == 0) {
+  //     controller.setMode(StockInMode.poBased);
+  //   } else if (_tabController.index == 1) {
+  //     controller.setMode(StockInMode.nonPo);
+  //   } else {
+  //     controller.setMode(StockInMode.grgi); // Tambah mode baru
+  //   }
+  // });
 
     _syncQtyControllers();
  //initPoItemQtyControllers();
@@ -271,7 +271,7 @@ void _syncQtyControllers() {
               if (controller.currentMode.value == StockInMode.poBased) {
                 controller.submitPoGoodsReceipt(context);
               } else {
-                controller.submitNonPoGoodsReceipt(context);
+                // controller.submitNonPoGoodsReceipt(context);
               }
             },
             icon: const Icon(Icons.save),
@@ -999,11 +999,11 @@ Widget _buildGrGiForm(BuildContext context) {
                             );
                             return result;
                           },
-                          selectedItem: controller.nonPoItems.firstWhereOrNull(
-                            (item) =>
-                                item['ItemCode'] ==
-                                controller.nonPoItemCodeController.text,
-                          ),
+                          // selectedItem: controller.nonPoItems.firstWhereOrNull(
+                          //   (item) =>
+                          //       item['ItemCode'] ==
+                          //       controller.nonPoItemCodeController.text,
+                          // ),
                           itemAsString:
                               (item) =>
                                   "${item['ItemCode']} - ${item['ItemName']}",
@@ -1034,52 +1034,52 @@ Widget _buildGrGiForm(BuildContext context) {
                               ),
                             ),
                         const SizedBox(height: 10),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton.icon(
-                            onPressed: controller.addNonPoItem,
-                            icon: const Icon(
-                              Icons.add_shopping_cart,
-                              color: Colors.green,
-                            ),
-                            label: const Text(
-                              "Add Item",
-                              style: TextStyle(color: Colors.green),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              side: BorderSide(
-                                color: Colors.green.shade500,
-                                width: 2,
-                              ),
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              minimumSize: const Size.fromHeight(
-                                56,
-                              ), // tinggi tombol jadi 56 px
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              elevation: 0,
-                            ).copyWith(
-                              // atur warna saat hover (web/desktop)
-                              overlayColor: MaterialStateProperty.resolveWith<
-                                Color?
-                              >((Set<MaterialState> states) {
-                                if (states.contains(MaterialState.hovered)) {
-                                  return Colors.green.shade500.withOpacity(
-                                    0.3,
-                                  ); // hover background hijau muda
-                                }
-                                if (states.contains(MaterialState.pressed)) {
-                                  return Colors.green.shade200.withOpacity(
-                                    0.5,
-                                  ); // pressed effect
-                                }
-                                return null; // default
-                              }),
-                            ),
-                          ),
-                        ),
+                        // SizedBox(
+                        //   width: double.infinity,
+                        //   child: ElevatedButton.icon(
+                        //     onPressed: controller.addNonPoItem,
+                        //     icon: const Icon(
+                        //       Icons.add_shopping_cart,
+                        //       color: Colors.green,
+                        //     ),
+                        //     label: const Text(
+                        //       "Add Item",
+                        //       style: TextStyle(color: Colors.green),
+                        //     ),
+                        //     style: ElevatedButton.styleFrom(
+                        //       backgroundColor: Colors.white,
+                        //       side: BorderSide(
+                        //         color: Colors.green.shade500,
+                        //         width: 2,
+                        //       ),
+                        //       padding: const EdgeInsets.symmetric(vertical: 12),
+                        //       minimumSize: const Size.fromHeight(
+                        //         56,
+                        //       ), // tinggi tombol jadi 56 px
+                        //       shape: RoundedRectangleBorder(
+                        //         borderRadius: BorderRadius.circular(8),
+                        //       ),
+                        //       elevation: 0,
+                        //     ).copyWith(
+                        //       // atur warna saat hover (web/desktop)
+                        //       overlayColor: MaterialStateProperty.resolveWith<
+                        //         Color?
+                        //       >((Set<MaterialState> states) {
+                        //         if (states.contains(MaterialState.hovered)) {
+                        //           return Colors.green.shade500.withOpacity(
+                        //             0.3,
+                        //           ); // hover background hijau muda
+                        //         }
+                        //         if (states.contains(MaterialState.pressed)) {
+                        //           return Colors.green.shade200.withOpacity(
+                        //             0.5,
+                        //           ); // pressed effect
+                        //         }
+                        //         return null; // default
+                        //       }),
+                        //     ),
+                        //   ),
+                        // ),
                         const SizedBox(height: 20),
                       ],
                     )
@@ -1159,7 +1159,7 @@ Widget _buildGrGiForm(BuildContext context) {
                                   // }
                                   if (qty > 0) {
                                       final newQty = (qty - 1).toDouble();
-                                      controller.updateNonPoItemQuantity(index, newQty);
+                                      //controller.updateNonPoItemQuantity(index, newQty);
 
                                       // ⬇️ update controller juga
                                       _nonPoQtyControllers[index].text = newQty == 0 ? '' : newQty.toInt().toString();
@@ -1194,17 +1194,17 @@ Widget _buildGrGiForm(BuildContext context) {
                                   keyboardType: TextInputType.number,
                                   onChanged: (value) {
                                     print(value);
-                                    controller.updateNonPoItemQuantity(
-                                      index,
-                                      double.tryParse(value) ?? 0,
-                                    );
+                                    // controller.updateNonPoItemQuantity(
+                                    //   index,
+                                    //   double.tryParse(value) ?? 0,
+                                    // );
                                   },
                                 ),
                               ),
                               IconButton(
                                  onPressed: () {
                                   final newQty = (qty + 1).toDouble();
-                                  controller.updateNonPoItemQuantity(index, newQty);
+                                 // controller.updateNonPoItemQuantity(index, newQty);
 
                                   _nonPoQtyControllers[index].text = newQty.toInt().toString();
                                 },
@@ -1219,19 +1219,19 @@ Widget _buildGrGiForm(BuildContext context) {
                                 ),
                               ),
                               const Spacer(),
-                              IconButton(
-                                icon: const Icon(
-                                  Icons.delete,
-                                  color: Colors.red,
-                                ),
-                                // onPressed: () {
-                                //   controller.updateNonPoItemQuantity(index, 0);
-                                //   _nonPoQtyControllers[index].text = '';
-                                // },
+                              // IconButton(
+                              //   icon: const Icon(
+                              //     Icons.delete,
+                              //     color: Colors.red,
+                              //   ),
+                              //   // onPressed: () {
+                              //   //   controller.updateNonPoItemQuantity(index, 0);
+                              //   //   _nonPoQtyControllers[index].text = '';
+                              //   // },
 
-                                 onPressed:
-                                     () => controller.removeNonPoItem(index),
-                              ),
+                              //    onPressed:
+                              //        () => controller.removeNonPoItem(index),
+                              // ),
                             ],
                           ),
                         ],

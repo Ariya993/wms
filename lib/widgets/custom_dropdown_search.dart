@@ -55,6 +55,7 @@ class CustomDropdownSearch<T> extends StatelessWidget {
           showSelectedItems: true,
           isFilterOnline: true, // <-- ini WAJIB agar search selalu panggil asyncItems
           searchDelay: const Duration(milliseconds: 500),
+          
           dialogProps: DialogProps(
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(6),

@@ -8,7 +8,8 @@ import '../services/api_service.dart';
 import '../services/sap_service.dart';
 import '../widgets/custom_dropdown_search.dart';
 
-enum StockInMode { poBased, nonPo,grgi }
+// enum StockInMode { poBased, nonPo,grgi }
+enum StockInMode { poBased, grgi,itr }
 
 class StockInController extends GetxController {
   final SAPService _apiService = Get.find<SAPService>();
@@ -23,7 +24,7 @@ class StockInController extends GetxController {
   final Rxn<Map<String, dynamic>> purchaseOrder = Rxn<Map<String, dynamic>>();
   final RxList<Map<String, dynamic>> poItems = <Map<String, dynamic>>[].obs;
 
-  // --- Non-PO Goods Receipt ---
+  // // --- Non-PO Goods Receipt ---
   final RxList<Map<String, dynamic>> nonPoItems = <Map<String, dynamic>>[].obs;
   final TextEditingController nonPoItemCodeController = TextEditingController();
   final TextEditingController nonPoItemNameController = TextEditingController();
@@ -36,12 +37,17 @@ final goodsIssue = Rxn<Map<String, dynamic>>();
 final grgiItems = <Map<String, dynamic>>[].obs;
 
 
+  // --- ITR Based Goods Receipt ---
+  final TextEditingController itrNumberController = TextEditingController();
+  final Rxn<Map<String, dynamic>> inventoryTransfer = Rxn<Map<String, dynamic>>();
+  final RxList<Map<String, dynamic>> itrItems = <Map<String, dynamic>>[].obs;
+
   final RxList<Map<String, dynamic>> vendorList = <Map<String, dynamic>>[].obs;
   final RxString selectedVendor = ''.obs;
   Rx<Map<String, dynamic>?> selectedWarehouse = Rx<Map<String, dynamic>?>(null);
   RxList<Map<String, dynamic>> warehouses = <Map<String, dynamic>>[].obs;
   RxList<Map<String, dynamic>> wmsUsers = <Map<String, dynamic>>[].obs;
-List<TextEditingController> poItemQtyControllers = [];
+  List<TextEditingController> poItemQtyControllers = [];
 
 
   final box = GetStorage();
@@ -56,9 +62,10 @@ List<TextEditingController> poItemQtyControllers = [];
   void onClose() {
     poNumberController.dispose();
     grgiNumberController.dispose();
-    nonPoItemCodeController.dispose();
-    nonPoItemNameController.dispose();
-    nonPoQuantityController.dispose();
+    itrNumberController.dispose();
+    // nonPoItemCodeController.dispose();
+    // nonPoItemNameController.dispose();
+    // nonPoQuantityController.dispose();
     super.onClose();
   }
 
@@ -78,10 +85,11 @@ List<TextEditingController> poItemQtyControllers = [];
     goodsIssue.value = null;
     grgiItems.clear();
 
-    nonPoItems.clear();
-    nonPoItemCodeController.clear();
-    nonPoItemNameController.clear();
-    nonPoQuantityController.clear();
+     itrNumberController.clear(); 
+    inventoryTransfer.value = null;
+    itrItems.clear();
+
+     
   }
 
   Future<void> fetchDropdownData() async {
@@ -201,6 +209,7 @@ List<TextEditingController> poItemQtyControllers = [];
   }
  void updateGrgiItemQuantity(int index, double quantity) {
     if (index >= 0 && index < grgiItems.length) {
+      
       final item = grgiItems[index];
       if (quantity <= (item["RemainingOpenQuantity"] ?? 0)) {
         item["currentReceivedQuantity"] = quantity;
@@ -237,8 +246,10 @@ List<TextEditingController> poItemQtyControllers = [];
       );
       return;
     }
-   
-    final result = await showSubmitDialog(context);
+    final firstWarehouse = itrItems.first["WarehouseCode"];
+
+    final result = await showSubmitDialog(context,firstWarehouse);
+    
     if (result == null) return;
      String warehouse_code =  selectedWarehouse.value?["warehouseCode"] ?? box.read('warehouse_code');
     final warehouse = {'warehouse_code': warehouse_code};
@@ -286,7 +297,7 @@ List<TextEditingController> poItemQtyControllers = [];
 
     isLoading.value = true;
      
-    final success = await _apiService.postGoodsReceiptNonPo(payload);
+    final success = await _apiService.postAdjustment(payload,'in');
      print('stock in controller post:  $success');
 //final success=true;
     if (success) {
@@ -401,15 +412,7 @@ List<TextEditingController> poItemQtyControllers = [];
         purchaseOrder.value = null;
       }
     }
-    // else {
-    //   Get.snackbar(
-    //     'Not Found',
-    //     'PO ${poNumberController.text} not found or error occurred.',
-    //     snackPosition: SnackPosition.TOP,
-    //     backgroundColor: Colors.red.shade700,
-    //     colorText: Colors.white,
-    //   );
-    // }
+    
   }
 
   void updatePoItemQuantity(int index, double quantity) {
@@ -440,33 +443,7 @@ List<TextEditingController> poItemQtyControllers = [];
     }
   }
 
-  void updateNonPoItemQuantity(int index, double quantity) {
-    if (index >= 0 && index < nonPoItems.length) {
-      final item = nonPoItems[index];
-      final double openQty =
-          item["RemainingOpenInventoryQuantity"] ?? double.infinity;
-      if (quantity > openQty) {
-        Get.snackbar(
-          'Oops',
-          'Quantity tidak boleh lebih dari open quantity ($openQty)',
-          snackPosition: SnackPosition.TOP,
-          backgroundColor: Colors.orange.shade700,
-          colorText: Colors.white,
-        );
-        quantity = openQty;
-      }
-      item["currentReceivedQuantity"] = quantity;
-      nonPoItems[index] = item;
-      poItems.refresh();
-    }
-  }
-
-  void removeNonPoItem(int index) {
-    if (index >= 0 && index < nonPoItems.length) {
-      nonPoItems.removeAt(index);
-    }
-  }
-
+  
   Future<void> submitPoGoodsReceipt(BuildContext context) async {
     if (purchaseOrder.value == null ||
         poItems.every((item) => item["currentReceivedQuantity"] <= 0)) {
@@ -480,8 +457,9 @@ List<TextEditingController> poItemQtyControllers = [];
       return;
     }
     
+ final firstWarehouse = itrItems.first["WarehouseCode"];
 
-    final result = await showSubmitDialog(context);
+    final result = await showSubmitDialog(context,firstWarehouse);
     if (result == null) return;
 
     String warehouse_code =
@@ -552,7 +530,7 @@ List<TextEditingController> poItemQtyControllers = [];
     }
   }
 
-  Future<Map<String, dynamic>?> showSubmitDialog(BuildContext context) async {
+  Future<Map<String, dynamic>?> showSubmitDialog(BuildContext context,String warehouse_code) async {
     TextEditingController dateController = TextEditingController(
       text: DateFormat('yyyy-MM-dd').format(DateTime.now()),
     );
@@ -560,6 +538,12 @@ List<TextEditingController> poItemQtyControllers = [];
         TextEditingController(); // Controller untuk Remarks
     TextEditingController norefController = TextEditingController();
     RxString selectedVendor = ''.obs;
+Map<String, dynamic>? defaultWarehouse = warehouses
+      .firstWhere(
+        (wh) => wh['warehouseCode'] == warehouse_code, 
+      );
+
+ selectedWarehouse.value = (defaultWarehouse).obs;
 
     return await Get.dialog<Map<String, dynamic>>(
       Dialog(
@@ -765,21 +749,143 @@ List<TextEditingController> poItemQtyControllers = [];
     }
   }
 
-  Future<void> submitNonPoGoodsReceipt(BuildContext context) async {
-    if (nonPoItems.isEmpty) {
+   Future<void> searchITR() async {
+    if (itrNumberController.text.isEmpty) {
       Get.snackbar(
-        'No Items',
-        'Please add at least one item before submitting.',
+        'Input Required',
+        'Please enter a Transfer Request Number.',
         snackPosition: SnackPosition.TOP,
         backgroundColor: Colors.orange.shade700,
         colorText: Colors.white,
       );
       return;
     }
-   
-    final result = await showSubmitDialog(context);
+
+    isLoading.value = true;
+    inventoryTransfer.value = null;
+    itrItems.clear();
+
+    final itrData = await _apiService.fetchITRDetails(itrNumberController.text);
+    isLoading.value = false;
+
+    if (itrData != null) {
+      try {
+        inventoryTransfer.value = {
+          "docEntry": itrData["docEntry"],
+          "docNum": itrData["docNum"],
+          "cardCode": itrData["cardCode"],
+          "cardName": itrData["cardName"],
+          "docDate": itrData["docDate"],
+          "docDueDate": itrData["docDueDate"],
+          "fromWarehouse": itrData["fromWarehouse"],
+          "toWarehouse": itrData["toWarehouse"],
+          "documentStatus": itrData["documentStatus"],
+        };
+        if (inventoryTransfer.value!["documentStatus"] != "O") {
+          inventoryTransfer.value = null;
+          Get.snackbar(
+            'Info',
+            'Request Transfer ${itrData["docNum"]} is not open.',
+            snackPosition: SnackPosition.TOP,
+            backgroundColor: Colors.orangeAccent.shade700,
+            colorText: Colors.white,
+          );
+          return;
+        }
+        final lines = List<Map<String, dynamic>>.from(itrData["lines"]);
+        final openItems =
+            lines
+                .where(
+                  (item) => (item["RemainingOpenQuantity"] ?? 0) > 0,
+                )
+                .toList();
+
+        for (var item in openItems) {
+          item["currentReceivedQuantity"] = 0.0;
+        }
+
+        itrItems.assignAll(openItems);
+
+        if (openItems.isEmpty) {
+          Get.snackbar(
+            'Info',
+            'PO ${itrData["docNum"]} has no open items.',
+            snackPosition: SnackPosition.TOP,
+            backgroundColor: Colors.orangeAccent.shade700,
+            colorText: Colors.white,
+          );
+        }
+        else
+        {
+          Get.snackbar(
+        'Transfer Request Number Found',
+        'Please scan QR to add add items',
+        snackPosition: SnackPosition.TOP,
+        backgroundColor: Colors.green.shade700,
+        colorText: Colors.white,
+      );
+        }
+      } catch (e) {
+        Get.snackbar(
+          'Error',
+          'Failed to process PO data: $e',
+          snackPosition: SnackPosition.TOP,
+          backgroundColor: Colors.red.shade700,
+          colorText: Colors.white,
+        );
+        inventoryTransfer.value = null;
+      }
+    }
+    
+  }
+
+  void updateitrItemQuantity(int index, double quantity) {
+    if (index >= 0 && index < itrItems.length) {
+      final item = itrItems[index];
+      if (quantity <= (item["RemainingOpenQuantity"] ?? 0)) {
+        item["currentReceivedQuantity"] = quantity;
+      } else { 
+          final rawOpen = item["RemainingOpenQuantity"];
+          final openQty = (rawOpen is num) ? rawOpen.toDouble() : 0.0;
+           
+          quantity=openQty+1;
+          item["currentReceivedQuantity"] = quantity;
+        Get.snackbar(
+          'Warning',
+          'Quantity for "${item["ItemDescription"]}" cannot exceed open quantity (${item["RemainingOpenInventoryQuantity"]}).',
+          snackPosition: SnackPosition.TOP,
+          backgroundColor: Colors.orange.shade700,
+          colorText: Colors.white,
+        );
+      
+      }
+       item["currentReceivedQuantity"] = quantity;
+      itrItems[index] = item; 
+     itrItems.refresh(); 
+    }
+  }
+ 
+ 
+  Future<void> submitITRGoodsReceipt(BuildContext context) async {
+    debugPrint(itrItems.toString());
+    if (inventoryTransfer.value == null || itrItems.every((item) => item["currentReceivedQuantity"] <= 0)) {
+      Get.snackbar(
+        'Failed',
+        'Please select a valid data and ensure at least one item has a received quantity greater than 0.',
+        snackPosition: SnackPosition.TOP,
+        backgroundColor: Colors.orange.shade700,
+        colorText: Colors.white,
+      );
+      return;
+    }
+    
+    final firstWarehouse = itrItems.first["WarehouseCode"];
+
+    final result = await showSubmitDialog(context,firstWarehouse);
     if (result == null) return;
-     String warehouse_code =  selectedWarehouse.value?["warehouseCode"] ?? box.read('warehouse_code');
+
+    String warehouse_code =
+        selectedWarehouse.value?["warehouseCode"] ?? box.read('warehouse_code');
     final warehouse = {'warehouse_code': warehouse_code};
 
     final data = await _apiServices.getWarehouseAuth(warehouse);
@@ -802,88 +908,47 @@ List<TextEditingController> poItemQtyControllers = [];
       box.erase();
       Get.offAllNamed('/login');
     }
-
     final payload = {
-      "DocDate": result['DocDate'],
-      "NumAtCard": result['NoRef'],
-      "BPL_IDAssignedToInvoice": bpl_id,
-      "Comments": result['Comments'],
-      "DocumentLines":
-          nonPoItems
+      "DocDate": result['DocDate'],   
+      "Comments": result['Comments'] == null || result['Comments'].isEmpty
+                  ? result['NoRef']
+                  : "${result['Comments']} - ${result['NoRef']}",
+      "StockTransferLines":
+          itrItems
+              .where((item) => item["currentReceivedQuantity"] > 0)
               .map(
-                (e) => {
-                  "ItemCode": e["ItemCode"],
-                  "Quantity": e["currentReceivedQuantity"].toInt(),
-                  "WarehouseCode": warehouse_code,
+                (item) => {  
+                  "BaseType": 1250000001,
+                  "BaseEntry": inventoryTransfer.value!["docEntry"],
+                  "BaseLine": item["LineNum"],
+                  "Quantity": item["currentReceivedQuantity"].toInt(),
                 },
               )
               .toList(),
     };
 
     isLoading.value = true;
-    final success = await _apiService.postGoodsReceiptNonPo(payload);
-     print('stock in controller post:  $success');
-//final success=true;
+    final success = await _apiService.postGoodsReceiptITR(payload);
+    isLoading.value = false;
+
     if (success) {
-      Get.snackbar(
-        'Success',
-        'Data has been successfully submitted.',
-        snackPosition: SnackPosition.TOP,
-        backgroundColor: Colors.green.shade700,
-        colorText: Colors.white,
-        duration: Duration(seconds: 3),
-      );
-
-      // Delay reset form biar snackbar sempat muncul
-      Future.delayed(Duration(milliseconds: 500), () {
-        resetForm();
-      });
-    } else {
-      Get.snackbar(
-        'Failed',
-        'Submission failed. Please try again.',
-        snackPosition: SnackPosition.TOP,
-        backgroundColor: Colors.red.shade700,
-        colorText: Colors.white,
-      );
-    }
-  }
-
-  void addNonPoItem() {
-    final code = nonPoItemCodeController.text.trim();
-    final name = nonPoItemNameController.text.trim();
-    final qty = double.tryParse(nonPoQuantityController.text.trim()) ?? 0.0;
-
-    if (code.isEmpty || name.isEmpty || qty <= 0) {
-      Get.snackbar(
-        'Invalid Input',
-        'Please enter valid item code, name, and quantity.',
-        snackPosition: SnackPosition.TOP,
-        backgroundColor: Colors.orange.shade700,
-        colorText: Colors.white,
-      );
-      return;
-    }
-
-    final existingIndex = nonPoItems.indexWhere(
-      (item) => item["ItemCode"] == code,
+       Get.snackbar(
+      'Success',
+      'Data has been successfully submitted.',
+      snackPosition: SnackPosition.TOP,
+      backgroundColor: Colors.green.shade700,
+      colorText: Colors.white,
+      duration: Duration(seconds: 3),
     );
-    if (existingIndex != -1) {
-      nonPoItems[existingIndex]["currentReceivedQuantity"] += qty;
-      nonPoItems[existingIndex] = nonPoItems[existingIndex];
-    } else {
-      nonPoItems.add({
-        "ItemCode": code,
-        "ItemName": name,
-        "currentReceivedQuantity": qty,
-      });
-    }
 
-    nonPoItemCodeController.clear();
-    nonPoItemNameController.clear();
-    nonPoQuantityController.clear();
+    // Delay reset form biar snackbar sempat muncul
+    Future.delayed(Duration(milliseconds: 500), () {
+      resetForm();
+    });
+    }
   }
 
+  
   void handleScanResult(String scannedValue) async {
     FocusScope.of(Get.context!).unfocus();
     bool isNumeric(String s) => double.tryParse(s) != null;
@@ -893,11 +958,18 @@ List<TextEditingController> poItemQtyControllers = [];
         (item) => item["ItemCode"] == scannedValue,
       );
       if (itemIndex != -1) {
-        final item = poItems[itemIndex];
+        final scannedItem = poItems[itemIndex]; 
+              // Hapus item dari posisi aslinya
+              poItems.removeAt(itemIndex);  
+              poItems.insert(0, scannedItem); 
+              update();
+        final item = poItems[0];
+        // final item = poItems[itemIndex];
         final openQty = item["RemainingOpenInventoryQuantity"] ?? 0;
         final currentQty = item["currentReceivedQuantity"] ?? 0; 
         if (currentQty < openQty) {
-          updatePoItemQuantity(itemIndex, currentQty + 1);
+          updatePoItemQuantity(0, currentQty + 1);
+          // updatePoItemQuantity(itemIndex, currentQty + 1);
         } else {
           Get.snackbar(
             'Max Quantity',
@@ -914,7 +986,7 @@ List<TextEditingController> poItemQtyControllers = [];
         poNumberController.text = scannedValue;
         searchPo();
         Get.snackbar(
-          'PO Candidate',
+          'Searching',
           'Trying to search PO: $scannedValue',
           snackPosition: SnackPosition.TOP,
           backgroundColor: Colors.blue.shade600,
@@ -930,33 +1002,106 @@ List<TextEditingController> poItemQtyControllers = [];
         backgroundColor: Colors.red.shade400,
         colorText: Colors.white,
       );
-    } else {
-      final itemIndex = nonPoItems.indexWhere(
+    } 
+    else if (currentMode.value == StockInMode.itr) {
+      final itemIndex = itrItems.indexWhere(
         (item) => item["ItemCode"] == scannedValue,
       );
       if (itemIndex != -1) {
-        nonPoItems[itemIndex]["currentReceivedQuantity"] += 1;
-        nonPoItems[itemIndex] = nonPoItems[itemIndex];
-      } else {
-        final itemName = await _apiService.getItemName(scannedValue);
-        if (itemName != "") {
-          nonPoItems.add({
-            "ItemCode": scannedValue,
-            "ItemName": itemName, 
-            "currentReceivedQuantity": 1.0,
-          });
+        final scannedItem = itrItems[itemIndex]; 
+              // Hapus item dari posisi aslinya
+              itrItems.removeAt(itemIndex);  
+              itrItems.insert(0, scannedItem); 
+              update();
+        final item = itrItems[0];
+        // final item = poItems[itemIndex];
+        final openQty = item["RemainingOpenQuantity"] ?? 0;
+        final currentQty = item["currentReceivedQuantity"] ?? 0; 
+        if (currentQty < openQty) {
+          updateitrItemQuantity(0, currentQty + 1);
+          // updatePoItemQuantity(itemIndex, currentQty + 1);
         } else {
           Get.snackbar(
-            'Item Not Found',
-            'Scanned item code "$scannedValue" not found in the system.',
+            'Max Quantity',
+            'Qty untuk "${item["ItemDescription"]}" sudah mencapai limit open ($openQty).',
             snackPosition: SnackPosition.TOP,
-            backgroundColor: Colors.red.shade400,
+            backgroundColor: Colors.orange.shade700,
             colorText: Colors.white,
           );
         }
-
-        
+        return;
       }
-    }
+
+      if (inventoryTransfer.value == null && isNumeric(scannedValue)) {
+        itrNumberController.text = scannedValue;
+        searchITR();
+        Get.snackbar(
+          'Searching',
+          'Trying to search Transfer Request: $scannedValue',
+          snackPosition: SnackPosition.TOP,
+          backgroundColor: Colors.blue.shade600,
+          colorText: Colors.white,
+        );
+        return;
+      }
+
+      Get.snackbar(
+        'Not Matched',
+        'Item Code "$scannedValue" tidak terdaftar pada Trsnfer Request Number.',
+        snackPosition: SnackPosition.TOP,
+        backgroundColor: Colors.red.shade400,
+        colorText: Colors.white,
+      );
+    } 
+    else if (currentMode.value == StockInMode.grgi) {
+      final itemIndex = itrItems.indexWhere(
+        (item) => item["ItemCode"] == scannedValue,
+      );
+      if (itemIndex != -1) {
+        final scannedItem = grgiItems[itemIndex]; 
+              // Hapus item dari posisi aslinya
+              grgiItems.removeAt(itemIndex);  
+              grgiItems.insert(0, scannedItem); 
+              update();
+        final item = grgiItems[0];
+        // final item = poItems[itemIndex];
+        final openQty = item["RemainingOpenQuantity"] ?? 0;
+        final currentQty = item["currentReceivedQuantity"] ?? 0; 
+        if (currentQty < openQty) {
+          updateGrgiItemQuantity(0, currentQty + 1); 
+        } else {
+          Get.snackbar(
+            'Max Quantity',
+            'Qty untuk "${item["ItemDescription"]}" sudah mencapai limit open ($openQty).',
+            snackPosition: SnackPosition.TOP,
+            backgroundColor: Colors.orange.shade700,
+            colorText: Colors.white,
+          );
+        }
+        return;
+      }
+ 
+      if (goodsIssue.value == null && isNumeric(scannedValue)) {
+        grgiNumberController.text = scannedValue;
+        searchGrgi();
+        Get.snackbar(
+          'Searching',
+          'Trying to search Goods Receipt: $scannedValue',
+          snackPosition: SnackPosition.TOP,
+          backgroundColor: Colors.blue.shade600,
+          colorText: Colors.white,
+        );
+        return;
+      }
+
+      Get.snackbar(
+        'Not Matched',
+        'Item Code "$scannedValue" tidak terdaftar pada Goods Receipt Number.',
+        snackPosition: SnackPosition.TOP,
+        backgroundColor: Colors.red.shade400,
+        colorText: Colors.white,
+      );
+    } 
   }
 }
+

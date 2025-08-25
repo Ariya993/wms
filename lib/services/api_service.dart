@@ -28,8 +28,8 @@ class ApiService extends GetxService {
       return true;
     } else {
       Get.snackbar("Error", " Refresh Token failed: ${response.statusCode}");
-       box.erase();
-          Get.offAllNamed('/login'); 
+      box.erase();
+      Get.offAllNamed('/login');
       return false;
     }
   }
@@ -65,30 +65,31 @@ class ApiService extends GetxService {
       'internalKey': userId,
       'menuIds': menuIds.toList(), // Mengirim Set sebagai List<int>
     });
- 
-    try {
-      final response = await http.post(
-        url,
-        headers: _getHeaders(),
-        body: body,
-      );
 
-      if (response.statusCode == 204) { // NoContent 
+    try {
+      final response = await http.post(url, headers: _getHeaders(), body: body);
+
+      if (response.statusCode == 204) {
+        // NoContent
         return;
       } else {
         Get.snackbar(
           "Error",
           "Gagal menyimpan akses menu pengguna: ${response.statusCode} - ${response.body}",
-         snackPosition: SnackPosition.TOP,snackStyle: SnackStyle.FLOATING,backgroundColor: Colors.redAccent, colorText: Colors.white);
-        
+          snackPosition: SnackPosition.TOP,
+          snackStyle: SnackStyle.FLOATING,
+          backgroundColor: Colors.redAccent,
+          colorText: Colors.white,
+        );
       }
-    } catch (e) { 
+    } catch (e) {
       throw Exception('Network or server error: $e'); // Lempar exception umum
-    } 
+    }
   }
-Future<List<Map<String, dynamic>>> getPickers() async {
-  try {
-    final response = await http.get(
+
+  Future<List<Map<String, dynamic>>> getPickers() async {
+    try {
+      final response = await http.get(
         Uri.parse(apiWarehouseWMS),
         headers: _getHeaders(),
       );
@@ -101,18 +102,48 @@ Future<List<Map<String, dynamic>>> getPickers() async {
           "Error",
           "Gagal mengambil data picker: ${response.statusCode}",
         );
-        print("Response body: ${response.body}");
+        //print("Response body: ${response.body}");
         return [];
       }
-  } catch (e) {
-    Get.snackbar(
-      "Error", "Gagal mengambil data picker",
-      backgroundColor: Colors.red,
-      colorText: Colors.white,
-    );
-    return [];
+    } catch (e) {
+      Get.snackbar(
+        "Error",
+        "Gagal mengambil data picker",
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+      return [];
+    }
   }
-}
+Future<List<Map<String, dynamic>>> getIssueType() async {
+    try {
+      final response = await http.get(
+        Uri.parse(apiIssueTypeWMS),
+        headers: _getHeaders(),
+      );
+      debugPrint(response.body);
+      if (response.statusCode == 200) {
+        List<dynamic> data = json.decode(response.body);
+        return data.cast<Map<String, dynamic>>();
+      } else {
+        Get.snackbar(
+          "Error",
+          "Gagal mengambil data Issue Type: ${response.statusCode}",
+        );
+        //print("Response body: ${response.body}");
+        return [];
+      }
+    } catch (e) {
+      Get.snackbar(
+        "Error",
+        "Gagal mengambil data Issue Type",
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+      return [];
+    }
+  }
+
   Future<List<Map<String, dynamic>>> getWarehouses() async {
     try {
       final response = await http.get(
@@ -128,12 +159,12 @@ Future<List<Map<String, dynamic>>> getPickers() async {
           "Error",
           "Gagal mengambil data Warehouse: ${response.statusCode}",
         );
-        print("Response body: ${response.body}");
+        //print("Response body: ${response.body}");
         return [];
       }
     } catch (e) {
       Get.snackbar("Error", "Terjadi kesalahan saat mengambil Warehouse: $e");
-      print("Error fetching warehouses: $e");
+      //print("Error fetching warehouses: $e");
       return [];
     }
   }
@@ -154,12 +185,12 @@ Future<List<Map<String, dynamic>>> getPickers() async {
           "Error",
           "Gagal mengambil data User WMS: ${response.statusCode}",
         );
-        print("Response body: ${response.body}");
+      //  print("Response body: ${response.body}");
         return [];
       }
     } catch (e) {
       Get.snackbar("Error", "Terjadi kesalahan saat mengambil User WMS: $e");
-      print("Error fetching WMS users: $e");
+     // print("Error fetching WMS users: $e");
       return [];
     }
   }
@@ -173,7 +204,14 @@ Future<List<Map<String, dynamic>>> getPickers() async {
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        Get.snackbar("Success", "User created!",snackPosition: SnackPosition.TOP,snackStyle: SnackStyle.FLOATING,backgroundColor: Colors.green, colorText: Colors.white);
+        Get.snackbar(
+          "Success",
+          "User created!",
+          snackPosition: SnackPosition.TOP,
+          snackStyle: SnackStyle.FLOATING,
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+        );
         return true;
       } else {
         final errorData = json.decode(response.body);
@@ -190,12 +228,12 @@ Future<List<Map<String, dynamic>>> getPickers() async {
         }
 
         Get.snackbar("Error", errorMessage);
-        print("Failed to create user: ${response.body}");
+       // print("Failed to create user: ${response.body}");
         return false;
       }
     } catch (e) {
       Get.snackbar("Error", "Failed to create user: $e");
-      print("Error creating user: $e");
+     // print("Error creating user: $e");
       return false;
     }
   }
@@ -209,7 +247,14 @@ Future<List<Map<String, dynamic>>> getPickers() async {
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        Get.snackbar("Success", "User updated",snackPosition: SnackPosition.TOP,snackStyle: SnackStyle.FLOATING,backgroundColor: Colors.green, colorText: Colors.white);
+        Get.snackbar(
+          "Success",
+          "User updated",
+          snackPosition: SnackPosition.TOP,
+          snackStyle: SnackStyle.FLOATING,
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+        );
         return true;
       } else {
         final errorData = json.decode(response.body);
@@ -226,17 +271,23 @@ Future<List<Map<String, dynamic>>> getPickers() async {
         }
 
         Get.snackbar("Error", errorMessage);
-        print("Failed to update user: ${response.body}");
+      //  print("Failed to update user: ${response.body}");
         return false;
       }
     } catch (e) {
       Get.snackbar("Error", "Failed to updated user: $e");
-      print("Error creating user: $e");
+     // print("Error creating user: $e");
       return false;
     }
   }
 
-  Future<bool> SendFCM(String username,String platform,String title, String descr,String path) async {
+  Future<bool> SendFCM(
+    String username,
+    String platform,
+    String title,
+    String descr,
+    String path,
+  ) async {
     try {
       final body = jsonEncode({
         "device": username, // Ambil username dari GetStorage
@@ -247,30 +298,24 @@ Future<List<Map<String, dynamic>>> getPickers() async {
       });
 
       final response = await http.post(
-        Uri.parse(apiSendFCM), 
-        headers: {
-        "Content-Type": "application/json", 
-      },
+        Uri.parse(apiSendFCM),
+        headers: {"Content-Type": "application/json"},
         body: body,
       );
-      if (response.statusCode==204)
-      {
+      if (response.statusCode == 204) {
         return true;
-      }
-      else
-      {
+      } else {
         var a = json.decode(response.body);
-        print("Error creating user: $a");
-      return false;
+    //    print("Error creating user: $a");
+        return false;
       }
-      
-       
     } catch (e) {
       // Get.snackbar("Error", "Terjadi kesalahan saat: $e");
       // print("Error creating user: $e");
-        return false;
+      return false;
     }
   }
+
   Future<bool> PostWarehouseAuth(Map<String, dynamic> userData) async {
     try {
       final response = await http.post(
@@ -280,7 +325,6 @@ Future<List<Map<String, dynamic>>> getPickers() async {
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-      
         return true;
       } else {
         final errorData = json.decode(response.body);
@@ -297,38 +341,43 @@ Future<List<Map<String, dynamic>>> getPickers() async {
         }
 
         Get.snackbar("Error", errorMessage);
-        print("Failed to submit authentication: ${response.body}");
+       // print("Failed to submit authentication: ${response.body}");
         return false;
       }
     } catch (e) {
       Get.snackbar("Error", "Failed to submit authentication: $e");
-      print("Error creating user: $e");
+      //print("Error creating user: $e");
       return false;
     }
-  } 
-  
-  Future<Map<String, dynamic>?> getWarehouseAuth(Map<String, dynamic> data) async {
-  try {
-     final response = await http.post(
+  }
+
+  Future<Map<String, dynamic>?> getWarehouseAuth(
+    Map<String, dynamic> data,
+  ) async {
+    try {
+      final response = await http.post(
         Uri.parse('$apiWarehouseWMS/code'),
         headers: _getHeaders(),
-        body:json.encode(data), 
+        body: json.encode(data),
       );
 
       if (response.statusCode == 200) {
-       Map<String, dynamic> data = json.decode(response.body);
+        Map<String, dynamic> data = json.decode(response.body);
         return data;
-      } else { 
+      } else {
         return null;
       }
-  } catch (e) {
-    Get.snackbar('Error', 'Gagal load data auhorization: $e');
-    return null;
+    } catch (e) {
+      Get.snackbar('Error', 'Gagal load data auhorization: $e');
+      return null;
+    }
   }
-}
 
-Future<bool> saveUserWarehouses(int userId, List<String> warehouseCodes) async {
-  // final url = Uri.parse('$apiMenuWMS'); // Sesuaikan endpoint kamu
+  Future<bool> saveUserWarehouses(
+    int userId,
+    List<String> warehouseCodes,
+  ) async {
+    // final url = Uri.parse('$apiMenuWMS'); // Sesuaikan endpoint kamu
     final user = box.read('username');
     final body = {
       'appuser_id': userId,
@@ -336,7 +385,7 @@ Future<bool> saveUserWarehouses(int userId, List<String> warehouseCodes) async {
       'user_created': user,
     };
 
-try {
+    try {
       final response = await http.post(
         Uri.parse(apiUserWarehouseWMS),
         headers: _getHeaders(),
@@ -344,7 +393,14 @@ try {
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        Get.snackbar("Success", "Setting warehouse success",snackPosition: SnackPosition.TOP,snackStyle: SnackStyle.FLOATING,backgroundColor: Colors.green, colorText: Colors.white);
+        Get.snackbar(
+          "Success",
+          "Setting warehouse success",
+          snackPosition: SnackPosition.TOP,
+          snackStyle: SnackStyle.FLOATING,
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+        );
         return true;
       } else {
         final errorData = json.decode(response.body);
@@ -361,47 +417,41 @@ try {
         }
 
         Get.snackbar("Error", errorMessage);
-        print("Failed to setting warehouse: ${response.body}");
+       // print("Failed to setting warehouse: ${response.body}");
         return false;
       }
     } catch (e) {
       Get.snackbar("Error", "Failed to setting warehouse: $e");
-      print("Error setting warehouse: $e");
+   //   print("Error setting warehouse: $e");
       return false;
     }
 
+    // final response = await http.post(
+    //   url,
+    //   headers: {
+    //     'Content-Type': 'application/json',
+    //     'Authorization': 'Bearer ${getToken()}', // kalau pakai token
+    //   },
+    //   body: jsonEncode(body),
+    // );
 
-  // final response = await http.post(
-  //   url,
-  //   headers: {
-  //     'Content-Type': 'application/json',
-  //     'Authorization': 'Bearer ${getToken()}', // kalau pakai token
-  //   },
-  //   body: jsonEncode(body),
-  // );
+    // if (response.statusCode != 200) {
+    //   throw Exception('Failed to save user warehouses: ${response.body}');
+    // }
+  }
 
-  // if (response.statusCode != 200) {
-  //   throw Exception('Failed to save user warehouses: ${response.body}');
-  // }
-}
-
-Future<List<Map<String, dynamic>>> getUserWarehouse(String appuser_id) async {
+  Future<List<Map<String, dynamic>>> getUserWarehouse(String appuser_id) async {
     try {
-        final headers = _getHeaders(); 
-// print (appuser_id);
-// print(headers);
+      final headers = _getHeaders();
+      // print (appuser_id);
+      // print(headers);
       final response = await http.get(
         Uri.parse('$apiUserWarehouseWMS?appuser_id=$appuser_id'),
         headers: headers,
       );
 
-      if (response.statusCode == 200) { 
-        
+      if (response.statusCode == 200) {
         final decoded = json.decode(response.body);
-//         print(response.body);
-// print(decoded.runtimeType); // cek apakah Map
-// print(decoded['data'].runtimeType); // cek apakah List
-// print(decoded['data']); // lihat isi list-nya
 
         if (decoded is Map<String, dynamic> && decoded.containsKey('data')) {
           final dataList = decoded['data'];
@@ -410,23 +460,112 @@ Future<List<Map<String, dynamic>>> getUserWarehouse(String appuser_id) async {
                 .whereType<Map<String, dynamic>>()
                 .toList(); // aman tanpa throw
           }
-        } 
+        }
 
-      return []; 
+        return [];
       } else {
         Get.snackbar(
           "Error",
           "Gagal mengambil data WMS user warehouse : ${response.statusCode}",
         );
-        print("Response body: ${response.body}");
+        //print("Response body: ${response.body}");
         return [];
       }
     } catch (e) {
-      Get.snackbar("Error", "Terjadi kesalahan saat mengambil user warehouse: $e");
-      print("Error fetching user warehouse: $e");
+      Get.snackbar(
+        "Error",
+        "Terjadi kesalahan saat mengambil user warehouse: $e",
+      );
+     // print("Error fetching user warehouse: $e");
       return [];
     }
   }
 
+  Future<bool> postStockOpname(Map<String, dynamic> data) async {
+    try {
+     // print(json.encode(data));
+     // print(apiStockOpnameWMS);
+      final response = await http.post(
+        Uri.parse(apiStockOpnameWMS),
+        headers: _getHeaders(),
+        body: json.encode(data),
+      );
+      //print(response.statusCode);
+      //print(response.body);
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        Get.snackbar(
+          "Success",
+          "Submitted Successfully!",
+          snackPosition: SnackPosition.TOP,
+          snackStyle: SnackStyle.FLOATING,
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+        );
+        return true;
+      } else {
+        final errorData = json.decode(response.body);
+        String errorMessage = "Error";
 
+        if (errorData['errors'] != null) {
+          // Ambil semua pesan error dari field 'errors'
+          final errors = errorData['errors'] as Map<String, dynamic>;
+          errorMessage = errors.entries
+              .map((e) => "${e.key}: ${e.value.join(', ')}")
+              .join('\n');
+        } else if (errorData['message'] != null) {
+          errorMessage = errorData['message'];
+        }
+
+        Get.snackbar("Error", errorMessage);
+        //print("Failed to post stock opname: ${response.body}");
+        return false;
+      }
+    } catch (e) {
+      Get.snackbar("Error", "Failed to create user: $e");
+     // print("Error post stock opname: $e");
+      return false;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> fetchListOpname({
+    String? warehouse,
+  }) async {
+    try {
+      final username = box.read('username');
+      if (warehouse == '') {
+        warehouse = box.read('warehouse_code');
+      }
+      final body = jsonEncode({
+        'username': username,
+        'warehouse_code': warehouse,
+      });
+      final response = await http.post(
+        Uri.parse('$apiStockOpnameWMS/picker'),
+        headers: _getHeaders(),
+        body: body,
+      );
+        
+      // print(response.body);
+      if (response.statusCode == 200) {
+        // Map<String, dynamic> data = json.decode(response.body);
+        // return [data];
+        
+        List<dynamic> data = json.decode(response.body);
+        return data.cast<Map<String, dynamic>>();
+      } else if (response.statusCode == 204) {
+        return [];
+        }else {
+        Get.snackbar(
+          "Error",
+          "Gagal mengambil list stock opname: ${response.statusCode}",
+        );
+        //print("Gagal mengambil list stock opname : ${response.body}");
+        return [];
+      }
+    } catch (e) {
+      Get.snackbar("Error", "Terjadi kesalahan saat list stock opname: $e");
+     // print("Error fetching list stock opname: $e");
+      return [];
+    }
+  }
 }

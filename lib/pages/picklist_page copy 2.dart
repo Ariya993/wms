@@ -22,12 +22,7 @@ class _PicklistsPageState extends State<PicklistsPage> {
   // const PicklistsPage({super.key});
   late final PicklistController controller = Get.put(PicklistController());
   late final ItemController itemController = Get.put(ItemController());
-  @override
-  void initState() {
-    super.initState();
-    controller.fetchPickList(reset: true);
-  }
- 
+
   // @override
   // void dispose() {
   //   scrollController.dispose();
@@ -493,7 +488,7 @@ class _PicklistsPageState extends State<PicklistsPage> {
                                       foregroundColor: Colors.white,
                                       textStyle: const TextStyle(fontSize: 12),
                                     ),
-                                    child: const Text('Change Picker'),
+                                    child: const Text('Edit'),
                                   ),
                                   // const SizedBox(width: 6),
                                   // OutlinedButton(
@@ -561,138 +556,89 @@ class _PicklistsPageState extends State<PicklistsPage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Padding(
-                              padding: const EdgeInsets.all(16),
-                              // padding: const EdgeInsets.symmetric(
-                              //   horizontal: 20,
-                              //   vertical: 16,
-                              // ),
-                              child: 
-                             Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      // Row: Name + Badge
-      Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Expanded(
-            child: Text(
-              picklist['Name'] ?? 'No Name',
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 18,
-                color: colorScheme.onSurface,
-              ),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          StatusBadge(
-            text: isViewOnly ? 'Closed' : 'Released',
-            backgroundColor:
-                isViewOnly ? Colors.red.shade100 : Colors.blue.shade100,
-            textColor:
-                isViewOnly ? Colors.red.shade600 : Colors.blue.shade600,
-            icon: isViewOnly
-                ? Icons.lock_outline
-                : Icons.check_circle_outline,
-          ),
-        ],
-      ),
-      const SizedBox(height: 6),
-
-      // Detail info
-      Text(
-        'Total Items: ${(picklist['DocumentLine'] as List).length}',
-        style: TextStyle(color: Colors.grey[700], fontSize: 14),
-      ),
-      Text(
-        'Pick Date: ${format.formatPickDate(picklist['PickDate'])}',
-        style: TextStyle(color: Colors.grey[700], fontSize: 14),
-      ),
-      Text(
-        'Remarks: ${picklist['Remarks'] ?? '-'}',
-        style: TextStyle(color: Colors.grey[700], fontSize: 14),
-      ),
-    ],
-  ),
-                              // Row(
-                              //   crossAxisAlignment: CrossAxisAlignment.start,
-                              //   children: [
-                              //     Icon(
-                              //       isViewOnly
-                              //           ? Icons.lock_outline
-                              //           : Icons.playlist_add_check,
-                              //       color:
-                              //           isViewOnly
-                              //               ? colorScheme.error
-                              //               : colorScheme.primary,
-                              //       size: 30,
-                              //     ),
-                              //     const SizedBox(width: 16),
-                              //     Expanded(
-                              //       child: Column(
-                              //         crossAxisAlignment:
-                              //             CrossAxisAlignment.start,
-                              //         children: [
-                              //           Text(
-                              //             picklist['Name'] ?? 'No Name',
-                              //             style: TextStyle(
-                              //               fontWeight: FontWeight.w600,
-                              //               fontSize: 18,
-                              //               color: colorScheme.onSurface,
-                              //             ),
-                              //           ),
-                              //           const SizedBox(height: 6),
-                              //           Text(
-                              //             'Total Items: ${(picklist['DocumentLine'] as List).length}',
-                              //             style: TextStyle(
-                              //               color: Colors.grey[700],
-                              //               fontSize: 14,
-                              //             ),
-                              //           ),
-                              //           const SizedBox(height: 4),
-                              //           Text(
-                              //             'Pick Date: ${format.formatPickDate(picklist['PickDate'])}',
-                              //             style: TextStyle(
-                              //               color: Colors.grey[700],
-                              //               fontSize: 14,
-                              //             ),
-                              //           ),
-                              //           const SizedBox(height: 4),
-                              //           Text(
-                              //             'Remarks: ${picklist['Remarks'] ?? '-'}',
-                              //             style: TextStyle(
-                              //               color: Colors.grey[700],
-                              //               fontSize: 14,
-                              //             ),
-                              //           ),
-                              //         ],
-                              //       ),
-                              //     ),
-                              //     const SizedBox(width: 8),
-                              //     StatusBadge(
-                              //       text: isViewOnly ? 'Closed' : 'Released',
-                              //       backgroundColor:
-                              //           isViewOnly
-                              //               ? Colors.red.shade100
-                              //               : Colors.blue.shade100,
-                              //       textColor:
-                              //           isViewOnly
-                              //               ? Colors.red.shade600
-                              //               : Colors.blue.shade600,
-                              //       icon:
-                              //           isViewOnly
-                              //               ? Icons.lock_outline
-                              //               : Icons.check_circle_outline,
-                              //     ),
-                              //     Icon(
-                              //       Icons.arrow_forward_ios,
-                              //       size: 18,
-                              //       color: colorScheme.onSurface.withOpacity(
-                              //         0.5,
-                              //       ),
-                              //     ),
-                              //   ],
-                              // ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 16,
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Icon(
+                                    isViewOnly
+                                        ? Icons.lock_outline
+                                        : Icons.playlist_add_check,
+                                    color:
+                                        isViewOnly
+                                            ? colorScheme.error
+                                            : colorScheme.primary,
+                                    size: 30,
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          picklist['Name'] ?? 'No Name',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 18,
+                                            color: colorScheme.onSurface,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          'Total Items: ${(picklist['DocumentLine'] as List).length}',
+                                          style: TextStyle(
+                                            color: Colors.grey[700],
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          'Pick Date: ${format.formatPickDate(picklist['PickDate'])}',
+                                          style: TextStyle(
+                                            color: Colors.grey[700],
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          'Remarks: ${picklist['Remarks'] ?? '-'}',
+                                          style: TextStyle(
+                                            color: Colors.grey[700],
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  StatusBadge(
+                                    text: isViewOnly ? 'Closed' : 'Released',
+                                    backgroundColor:
+                                        isViewOnly
+                                            ? Colors.red.shade100
+                                            : Colors.blue.shade100,
+                                    textColor:
+                                        isViewOnly
+                                            ? Colors.red.shade600
+                                            : Colors.blue.shade600,
+                                    icon:
+                                        isViewOnly
+                                            ? Icons.lock_outline
+                                            : Icons.check_circle_outline,
+                                  ),
+                                  Icon(
+                                    Icons.arrow_forward_ios,
+                                    size: 18,
+                                    color: colorScheme.onSurface.withOpacity(
+                                      0.5,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
 
                             // Divider di luar padding
@@ -722,7 +668,7 @@ class _PicklistsPageState extends State<PicklistsPage> {
                                         );
                                       },
                                       icon: const Icon(Icons.edit, size: 16),
-                                      label: const Text('Change Picker'),
+                                      label: const Text('Edit'),
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: colorScheme.primary,
                                         foregroundColor: Colors.white,

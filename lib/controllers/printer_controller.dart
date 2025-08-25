@@ -389,7 +389,7 @@ class PrinterController extends GetxController {
 
       final List<int> bytesImage = byteData!.buffer.asUint8List().toList();
 
-      print("Image Width: ${image.width}, Height: ${image.height}");
+      //print("Image Width: ${image.width}, Height: ${image.height}");
       final printData = PrintData.fromMap({
         "bytes": bytesImage, // atau rgba
         "width": image.width,

@@ -33,7 +33,7 @@ class PickableItem {
   RxDouble
   simulatedAvailableQuantity; // <-- NEW: Kuantitas tersedia yang disimulasikan di frontend
   RxBool isSelected;
- RxString note = ''.obs;
+  RxString note = ''.obs;
   PickableItem({
     required this.docType,
     required this.docEntry,
@@ -76,7 +76,7 @@ class PickableItem {
       }
     });
   }
- 
+
   void setPickedQuantity(double value) {
     if (value < 0) value = 0; // Kuantitas tidak bisa negatif
 
@@ -106,14 +106,16 @@ class PickPackController extends GetxController {
   final ItemController itemcontroller = Get.find<ItemController>();
   RxList<PickableItem> pickableItems = <PickableItem>[].obs;
   RxBool isLoading = true.obs;
+  var _loadingCounter = 0.obs;
   RxString errorMessage = ''.obs;
   var searchQuery = ''.obs;
   var filterType = 'ALL'.obs;
   int _page = 0;
-  int _pageSize = 1; // Mungkin perlu disesuaikan jika ingin fetch lebih banyak per halaman
+  int _pageSize =
+      1; // Mungkin perlu disesuaikan jika ingin fetch lebih banyak per halaman
   int _maxAutoFetch = 5;
   int _autoFetchCount = 0;
-    int _loop = 0;
+  int _loop = 0;
   RxBool hasMoreData = true.obs;
   RxBool isFetchingMore = false.obs;
   String? currentSource;
@@ -122,38 +124,66 @@ class PickPackController extends GetxController {
   RxString pickerValue = ''.obs;
   Rx<Map<String, dynamic>?> selectedPicker = Rx<Map<String, dynamic>?>(null);
   RxList<Map<String, dynamic>> Picker = <Map<String, dynamic>>[].obs;
-  final box = GetStorage(); 
-
+  final box = GetStorage();
+  var outstandingPickList = <Map<String, dynamic>>[].obs;
   RxString note = ''.obs; // Tambahkan ini jika belum ada
-// Tambahkan filteredItems
-RxList<PickableItem> filteredItems = <PickableItem>[].obs;
+  // Tambahkan filteredItems
+  RxList<PickableItem> filteredItems = <PickableItem>[].obs;
 
- 
+  @override
+  void onInit() {
+    super.onInit();
+    init();
+    // fetchDropdownData();
+    // fetchPickableItems(reset: true);
+  }
+ void _startLoading() {
+  _loadingCounter.value++;
+  isLoading.value = true;
+}
 
-@override
-void onInit() {
-  super.onInit();
- init();
-  // fetchDropdownData();
-  // fetchPickableItems(reset: true);
+void _stopLoading() {
+  _loadingCounter.value--;
+  if (_loadingCounter.value <= 0) {
+    isLoading.value = false;
+    _loadingCounter.value = 0;
+  }
 }
-Future<void> init() async {
-  // await fetchDropdownData();
-  //  searchQuery.value = '';   
-  // await fetchPickableItems(reset: true);
-  await Future.wait([
-    fetchDropdownData(),
-    fetchPickableItems(reset: true)
-  ]);
-}
+  Future<void> init() async {
+    // await fetchDropdownData();
+    //  searchQuery.value = '';
+    // await fetchPickableItems(reset: true);
+    await Future.wait([fetchDropdownData(), fetchPickableItems(reset: true),fetchOutstandingPicklist()]);
+  }
+Future<void> fetchOutstandingPicklist() async {
+   _startLoading();
+    try {
+      final fetchedPicker = await _sapB1Service.getOutstandingPickList();
+
+      outstandingPickList.value = fetchedPicker;
+      print(outstandingPickList);
+    } catch (e) {
+      Get.snackbar(
+        "Error",
+        "Failed to load dropdown: $e",
+        snackPosition: SnackPosition.TOP,
+        snackStyle: SnackStyle.FLOATING,
+        backgroundColor: Colors.redAccent,
+        colorText: Colors.white,
+      );
+    } finally {
+     _stopLoading();
+    }
+  }
 
   Future<void> fetchDropdownData() async {
-    isLoading.value = true;
+    _startLoading();
     try {
       final fetchedPicker = await _apiService.getWMSUsers();
-      final filteredPickers = fetchedPicker.where((picker) {
-        return picker['warehouse_code'] == box.read("warehouse_code");
-      }).toList();
+      final filteredPickers =
+          fetchedPicker.where((picker) {
+            return picker['warehouse_code'] == box.read("warehouse_code");
+          }).toList();
 
       Picker.assignAll(filteredPickers);
     } catch (e) {
@@ -166,14 +196,18 @@ Future<void> init() async {
         colorText: Colors.white,
       );
     } finally {
-      isLoading.value = false;
+     _stopLoading();
     }
   }
 
   @override
-  Future<void> fetchPickableItems({bool reset = false, String? source, String? warehouse}) async {
- final cacheKey = '${source}_${warehouse}_${_page}';
- 
+  Future<void> fetchPickableItems({
+    bool reset = false,
+    String? source,
+    String? warehouse,
+  }) async {
+    final cacheKey = '${source}_${warehouse}_${_page}';
+    debugPrint('Fetching pickpack');
     if (reset) {
       _page = 0;
       _pageSize = 1; // Reset juga pageSize
@@ -186,23 +220,22 @@ Future<void> init() async {
       isFetchingMore.value = true;
     }
 
-    if (reset) isLoading.value = true;
+    if (reset) _startLoading();
     errorMessage.value = '';
     warehouse ??= box.read('warehouse_code');
-    String mSource=source.toString();
-    String mWarehouse=warehouse.toString();
-   print(_page);
-   print(mWarehouse);
-print(mSource);
+    String mSource = source.toString();
+    String mWarehouse = warehouse.toString();
+ 
     try {
-      final List<Map<String, dynamic>> pickpack = await _sapB1Service.getPickPack(
-        _page * 20, // Offset untuk pagination
-        source ?? currentSource ?? 'ALL',
-        searchQuery.value,warehouse
-      );
+      final List<Map<String, dynamic>> pickpack = await _sapB1Service
+          .getPickPack(
+            _page * 20, // Offset untuk pagination
+            source ?? currentSource ?? 'ALL',
+            searchQuery.value,
+            warehouse,
+          );
 
       if (pickpack.isEmpty) {
-         
         hasMoreData.value = false;
       } else {
         List<PickableItem> tempItems = [];
@@ -212,26 +245,33 @@ print(mSource);
           final String docNum = doc['DocNum']?.toString() ?? 'N/A';
           final String? cardCode = doc['CardCode'] as String?;
           final String? cardName = doc['CardName'] as String?;
+          
           final List<dynamic>? docLines = doc['DocumentLine'];
 
           if (docLines != null) {
             for (var line in docLines) {
-              final double openQty = (line['RemainingOpenQuantity'] as num?)?.toDouble() ?? 0.0;
+              final double openQty =
+                  (line['RemainingOpenQuantity'] as num?)?.toDouble() ?? 0.0;
               if (openQty > 0) {
                 final String itemCode = line['ItemCode'] ?? '';
                 final String itemName = line['ItemDescription'] ?? 'N/A';
                 final String sourceWarehouseCode =
-                    docType == "order" ? line['WarehouseCode'] ?? '' : line['FromWarehouseCode'] ?? '';
-                 double onHand = (line['onHand'] as num?)?.toDouble() ?? 0.0;
+                    docType == "order"
+                        ? line['WarehouseCode'] ?? ''
+                        : line['FromWarehouseCode'] ?? '';
+                double onHand = (line['onHand'] as num?)?.toDouble() ?? 0.0;
                 double inStock = (line['InStock'] as num?)?.toDouble() ?? 0.0;
-                double committed = (line['Committed'] as num?)?.toDouble() ?? 0.0;
-                double orderedFromPO = (line['Ordered'] as num?)?.toDouble() ?? 0.0;
+                double committed =
+                    (line['Committed'] as num?)?.toDouble() ?? 0.0;
+                double orderedFromPO =
+                    (line['Ordered'] as num?)?.toDouble() ?? 0.0;
                 double availableQuantity = 0.0; // Ini akan dihitung di bawah
 
                 // Hitung availableQuantity (dari InStock - Committed + OrderedFromPO)
                 availableQuantity = inStock;
-                inStock=onHand;
-                if (availableQuantity < 0) availableQuantity = 0.0; // Pastikan tidak negatif
+                inStock = onHand;
+                if (availableQuantity < 0)
+                  availableQuantity = 0.0; // Pastikan tidak negatif
 
                 tempItems.add(
                   PickableItem(
@@ -244,12 +284,14 @@ print(mSource);
                     itemCode: itemCode,
                     itemName: itemName,
                     sourceWarehouseCode: sourceWarehouseCode,
-                    orderedQuantity: (line['Quantity'] as num?)?.toDouble() ?? 0.0,
+                    orderedQuantity:
+                        (line['Quantity'] as num?)?.toDouble() ?? 0.0,
                     openQuantity: openQty,
                     initialInStock: inStock,
                     initialCommitted: committed,
                     initialOrderedFromPO: orderedFromPO,
-                    initialAvailableQuantity: availableQuantity, // Gunakan hasil perhitungan
+                    initialAvailableQuantity:
+                        availableQuantity, // Gunakan hasil perhitungan
                   ),
                 );
               }
@@ -257,28 +299,34 @@ print(mSource);
           }
         }
 
-          for (var item in tempItems) {
-            bool isDuplicate = pickableItems.any((existing) =>
-              existing.itemCode == item.itemCode &&
-              existing.docType == item.docType &&
-              existing.sourceWarehouseCode == item.sourceWarehouseCode &&
-              existing.docEntry == item.docEntry &&
-              existing.docLineNum == item.docLineNum);
+        for (var item in tempItems) {
+          bool isDuplicate = pickableItems.any(
+            (existing) =>
+                existing.itemCode == item.itemCode &&
+                existing.docType == item.docType &&
+                existing.sourceWarehouseCode == item.sourceWarehouseCode &&
+                existing.docEntry == item.docEntry &&
+                existing.docLineNum == item.docLineNum,
+          );
 
-            if (!isDuplicate) {
-              pickableItems.add(item);
-            }
+          if (!isDuplicate) {
+            pickableItems.add(item);
           }
- 
+        }
+
         _page++;
         // Otomatis fetch jika data kurang dari 5 dan masih ada data
         if (tempItems.length <= 8 && _autoFetchCount < _maxAutoFetch) {
           // if(_autoFetchCount == 0)
           // {
           _autoFetchCount++;
-           await Future.delayed(const Duration(milliseconds: 300)); 
-          await fetchPickableItems(reset:false,source:source ?? currentSource ?? 'ALL',warehouse: mWarehouse);
-         //} 
+          await Future.delayed(const Duration(milliseconds: 300));
+          await fetchPickableItems(
+            reset: false,
+            source: source ?? currentSource ?? 'ALL',
+            warehouse: mWarehouse,
+          );
+          //}
         }
         _updateAllSimulatedAvailableQuantities();
       }
@@ -291,14 +339,17 @@ print(mSource);
         colorText: Colors.white,
       );
     } finally {
-      isLoading.value = false;
+    if (reset) _stopLoading();
       isFetchingMore.value = false;
     }
   }
 
   @override
-  Future<void> scanPickableItems({bool reset = false, String? source, String? warehouse}) async {
- 
+  Future<void> scanPickableItems({
+    bool reset = false,
+    String? source,
+    String? warehouse,
+  }) async {
     if (reset) {
       _page = 0;
       _pageSize = 1; // Reset juga pageSize
@@ -314,16 +365,18 @@ print(mSource);
     if (reset) isLoading.value = true;
     errorMessage.value = '';
     warehouse ??= box.read('warehouse_code');
-    String mSource=source.toString();
-    String mWarehouse=warehouse.toString();
+    String mSource = source.toString();
+    String mWarehouse = warehouse.toString();
     // print(warehouse);
     // print(searchQuery.value);
     try {
-      final List<Map<String, dynamic>> pickpack = await _sapB1Service.getScanPickPack(
-        _page * 20, // Offset untuk pagination
-        source ?? currentSource ?? '',
-        searchQuery.value,warehouse
-      );
+      final List<Map<String, dynamic>> pickpack = await _sapB1Service
+          .getScanPickPack(
+            _page * 20, // Offset untuk pagination
+            source ?? currentSource ?? '',
+            searchQuery.value,
+            warehouse,
+          );
 
       if (pickpack.isEmpty) {
         hasMoreData.value = false;
@@ -339,22 +392,28 @@ print(mSource);
 
           if (docLines != null) {
             for (var line in docLines) {
-              final double openQty = (line['RemainingOpenQuantity'] as num?)?.toDouble() ?? 0.0;
+              final double openQty =
+                  (line['RemainingOpenQuantity'] as num?)?.toDouble() ?? 0.0;
               if (openQty > 0) {
                 final String itemCode = line['ItemCode'] ?? '';
                 final String itemName = line['ItemDescription'] ?? 'N/A';
                 final String sourceWarehouseCode =
-                    docType == "order" ? line['WarehouseCode'] ?? '' : line['FromWarehouseCode'] ?? '';
+                    docType == "order"
+                        ? line['WarehouseCode'] ?? ''
+                        : line['FromWarehouseCode'] ?? '';
                 double onHand = (line['onHand'] as num?)?.toDouble() ?? 0.0;
                 double inStock = (line['InStock'] as num?)?.toDouble() ?? 0.0;
-                double committed = (line['Committed'] as num?)?.toDouble() ?? 0.0;
-                double orderedFromPO = (line['Ordered'] as num?)?.toDouble() ?? 0.0;
+                double committed =
+                    (line['Committed'] as num?)?.toDouble() ?? 0.0;
+                double orderedFromPO =
+                    (line['Ordered'] as num?)?.toDouble() ?? 0.0;
                 double availableQuantity = 0.0; // Ini akan dihitung di bawah
 
                 // Hitung availableQuantity (dari InStock - Committed + OrderedFromPO)
                 availableQuantity = inStock;
-                inStock=onHand;
-                if (availableQuantity < 0) availableQuantity = 0.0; // Pastikan tidak negatif
+                inStock = onHand;
+                if (availableQuantity < 0)
+                  availableQuantity = 0.0; // Pastikan tidak negatif
 
                 tempItems.add(
                   PickableItem(
@@ -367,12 +426,14 @@ print(mSource);
                     itemCode: itemCode,
                     itemName: itemName,
                     sourceWarehouseCode: sourceWarehouseCode,
-                    orderedQuantity: (line['Quantity'] as num?)?.toDouble() ?? 0.0,
+                    orderedQuantity:
+                        (line['Quantity'] as num?)?.toDouble() ?? 0.0,
                     openQuantity: openQty,
                     initialInStock: inStock,
                     initialCommitted: committed,
                     initialOrderedFromPO: orderedFromPO,
-                    initialAvailableQuantity: availableQuantity, // Gunakan hasil perhitungan
+                    initialAvailableQuantity:
+                        availableQuantity, // Gunakan hasil perhitungan
                   ),
                 );
               }
@@ -384,13 +445,19 @@ print(mSource);
         _updateAllSimulatedAvailableQuantities();
         _page++;
         // Otomatis fetch jika data kurang dari 5 dan masih ada data
-        if (tempItems.length <=10 && hasMoreData.value && _autoFetchCount < _maxAutoFetch) {
+        if (tempItems.length <= 10 &&
+            hasMoreData.value &&
+            _autoFetchCount < _maxAutoFetch) {
           // if(_autoFetchCount == 0)
           // {
           _autoFetchCount++;
-           await Future.delayed(const Duration(milliseconds:300)); 
-          await fetchPickableItems(reset:false,source:mSource,warehouse: mWarehouse);
-         //} 
+          await Future.delayed(const Duration(milliseconds: 300));
+          await fetchPickableItems(
+            reset: false,
+            source: mSource,
+            warehouse: mWarehouse,
+          );
+          //}
         }
       }
     } catch (e) {
@@ -406,7 +473,6 @@ print(mSource);
       isFetchingMore.value = false;
     }
   }
-
 
   // Metode untuk memperbarui kuantitas tersedia yang disimulasikan
   void _updateAllSimulatedAvailableQuantities() {
@@ -427,11 +493,13 @@ print(mSource);
     // Perbarui simulatedAvailableQuantity untuk setiap item
     for (var item in pickableItems) {
       // Dapatkan total picked untuk itemCode ini (dari semua baris yang dipilih)
-      double totalPickedForThisItemCode = currentPickedTotalByItemCode[item.itemCode] ?? 0.0;
+      double totalPickedForThisItemCode =
+          currentPickedTotalByItemCode[item.itemCode] ?? 0.0;
 
       // Kuantitas tersedia yang disimulasikan adalah Kuantitas Tersedia Asli
       // dikurangi total yang sudah di-pick untuk itemCode tersebut.
-      double newSimulatedQty = item.originalAvailableQuantity - totalPickedForThisItemCode;
+      double newSimulatedQty =
+          item.originalAvailableQuantity - totalPickedForThisItemCode;
 
       // Pastikan simulatedAvailableQuantity tidak negatif
       if (newSimulatedQty < 0) {
@@ -452,7 +520,7 @@ print(mSource);
         // Coba atur pickedQuantity ke openQuantity atau originalAvailableQuantity (mana yang lebih kecil)
         double defaultPickQty = item.openQuantity;
         if (item.openQuantity > item.originalAvailableQuantity) {
-            defaultPickQty = item.originalAvailableQuantity;
+          defaultPickQty = item.originalAvailableQuantity;
         }
 
         // Lakukan simulasi awal untuk melihat apakah item ini bisa di-pick secara default
@@ -461,7 +529,9 @@ print(mSource);
         double potentialNewSimulatedAvailable = item.originalAvailableQuantity;
         for (var existingItem in pickableItems) {
           // Kurangi stok dari item lain yang SUDAH dipilih (kecuali item yang sedang di-toggle)
-          if (existingItem.isSelected.value && existingItem.itemCode == item.itemCode && existingItem != item) {
+          if (existingItem.isSelected.value &&
+              existingItem.itemCode == item.itemCode &&
+              existingItem != item) {
             potentialNewSimulatedAvailable -= existingItem.pickedQuantity.value;
           }
         }
@@ -487,7 +557,9 @@ print(mSource);
       } else {
         // Jika user menghilangkan centang
         item.isSelected.value = false;
-        item.setPickedQuantity(0.0); // Reset pickedQuantity saat tidak dicentang
+        item.setPickedQuantity(
+          0.0,
+        ); // Reset pickedQuantity saat tidak dicentang
       }
       _updateAllSimulatedAvailableQuantities(); // Perbarui simulasi setelah toggle
     }
@@ -514,28 +586,34 @@ print(mSource);
         double totalPickedForThisItemCodeIncludingCurrent = 0.0;
         for (var tempItem in pickableItems) {
           if (tempItem.itemCode == item.itemCode && tempItem.isSelected.value) {
-            totalPickedForThisItemCodeIncludingCurrent += tempItem.pickedQuantity.value;
+            totalPickedForThisItemCodeIncludingCurrent +=
+                tempItem.pickedQuantity.value;
           }
         }
 
-        if (totalPickedForThisItemCodeIncludingCurrent > item.originalAvailableQuantity) {
-            // Hitung berapa kelebihan pickedQuantity untuk item ini
-            double excess = totalPickedForThisItemCodeIncludingCurrent - item.originalAvailableQuantity;
-            // Kurangi pickedQuantity item ini sejumlah excess
-            double adjustedPickedQty = item.pickedQuantity.value - excess;
-            if (adjustedPickedQty < 0) adjustedPickedQty = 0.0;
+        if (totalPickedForThisItemCodeIncludingCurrent >
+            item.originalAvailableQuantity) {
+          // Hitung berapa kelebihan pickedQuantity untuk item ini
+          double excess =
+              totalPickedForThisItemCodeIncludingCurrent -
+              item.originalAvailableQuantity;
+          // Kurangi pickedQuantity item ini sejumlah excess
+          double adjustedPickedQty = item.pickedQuantity.value - excess;
+          if (adjustedPickedQty < 0) adjustedPickedQty = 0.0;
 
-            item.setPickedQuantity(adjustedPickedQty); // Set kuantitas yang disesuaikan
-            _updateAllSimulatedAvailableQuantities(); // Recalculate lagi setelah penyesuaian
+          item.setPickedQuantity(
+            adjustedPickedQty,
+          ); // Set kuantitas yang disesuaikan
+          _updateAllSimulatedAvailableQuantities(); // Recalculate lagi setelah penyesuaian
 
-            Get.snackbar(
-                "Warning",
-                "Total picked quantity for ${item.itemName} cannot exceed available stock. Adjusted to ${adjustedPickedQty.toStringAsFixed(0)} for this item.",
-                backgroundColor: Colors.orange,
-                colorText: Colors.white,
-                duration: const Duration(seconds: 4),
-                snackPosition: SnackPosition.BOTTOM,
-            );
+          Get.snackbar(
+            "Warning",
+            "Total picked quantity for ${item.itemName} cannot exceed available stock. Adjusted to ${adjustedPickedQty.toStringAsFixed(0)} for this item.",
+            backgroundColor: Colors.orange,
+            colorText: Colors.white,
+            duration: const Duration(seconds: 4),
+            snackPosition: SnackPosition.BOTTOM,
+          );
         }
 
         // Otomatis centang/un-centang berdasarkan pickedQuantity
@@ -553,11 +631,12 @@ print(mSource);
   Future<void> generatePickList({
     required DateTime pickDate,
     required String pickerName,
-    String? note,String? warehouse
+    String? note,
+    String? warehouse,
   }) async {
     isLoading.value = true;
     errorMessage.value = '';
-  //(warehouse);
+    //(warehouse);
     try {
       final List<Map<String, dynamic>> pickListLines = [];
       for (var item in pickableItems) {
@@ -569,30 +648,32 @@ print(mSource);
           // Jadi, item.pickedQuantity.value tidak boleh melebihi item.openQuantity
           // DAN total pick untuk itemCode tidak boleh melebihi originalAvailableQuantity
           double totalPickedForThisItemCodeFinal = 0.0;
-          for(var finalItem in pickableItems){
-            if(finalItem.itemCode == item.itemCode && finalItem.isSelected.value){
+          for (var finalItem in pickableItems) {
+            if (finalItem.itemCode == item.itemCode &&
+                finalItem.isSelected.value) {
               totalPickedForThisItemCodeFinal += finalItem.pickedQuantity.value;
             }
           }
 
           if (item.pickedQuantity.value > item.openQuantity) {
-             Get.snackbar(
-                "Error",
-                "Quantity pick for ${item.itemCode} cannot exceed the Qty Open (${item.openQuantity.toStringAsFixed(0)}).",
-                backgroundColor: Colors.red,
-                colorText: Colors.white,
-                duration: const Duration(seconds: 5), 
+            Get.snackbar(
+              "Error",
+              "Quantity pick for ${item.itemCode} cannot exceed the Qty Open (${item.openQuantity.toStringAsFixed(0)}).",
+              backgroundColor: Colors.red,
+              colorText: Colors.white,
+              duration: const Duration(seconds: 5),
             );
             isLoading.value = false;
             return;
           }
-          if (totalPickedForThisItemCodeFinal > item.originalAvailableQuantity) {
-             Get.snackbar(
-                "Error",
-                "Total quantity picked for ${item.itemCode} (${totalPickedForThisItemCodeFinal.toStringAsFixed(0)}) exceeds the available stock (${item.originalAvailableQuantity.toStringAsFixed(0)}).",
-                backgroundColor: Colors.red,
-                colorText: Colors.white,
-                duration: const Duration(seconds: 5), 
+          if (totalPickedForThisItemCodeFinal >
+              item.originalAvailableQuantity) {
+            Get.snackbar(
+              "Error",
+              "Total quantity picked for ${item.itemCode} (${totalPickedForThisItemCodeFinal.toStringAsFixed(0)}) exceeds the available stock (${item.originalAvailableQuantity.toStringAsFixed(0)}).",
+              backgroundColor: Colors.red,
+              colorText: Colors.white,
+              duration: const Duration(seconds: 5),
             );
             isLoading.value = false;
             return;
@@ -602,7 +683,8 @@ print(mSource);
           if (item.docType == "order") {
             baseObjectType = 17; // Object Type Code for Sales Order
           } else if (item.docType == "transfer") {
-            baseObjectType = 1250000001; // Object Type Code for Inventory Transfer Request
+            baseObjectType =
+                1250000001; // Object Type Code for Inventory Transfer Request
           } else {
             continue; // Lewati jika tipe dokumen tidak dikenal
           }
@@ -610,8 +692,10 @@ print(mSource);
           pickListLines.add({
             "OrderEntry": item.docEntry,
             "OrderRowID": item.docLineNum,
-            "PickedQuantity": 0, // Ini mungkin field yang salah. Harusnya ReleasedQuantity
-            "ReleasedQuantity": item.pickedQuantity.value, // Gunakan pickedQuantity di sini
+            "PickedQuantity":
+                0, // Ini mungkin field yang salah. Harusnya ReleasedQuantity
+            "ReleasedQuantity":
+                item.pickedQuantity.value, // Gunakan pickedQuantity di sini
             "PreviouslyReleasedQuantity": 0,
             "BaseObjectType": baseObjectType,
           });
@@ -623,7 +707,7 @@ print(mSource);
           "Warning",
           "No data saved. Please select items and enter quantities.",
           backgroundColor: Colors.orange,
-          colorText: Colors.white, 
+          colorText: Colors.white,
         );
         isLoading.value = false;
         return;
@@ -637,7 +721,8 @@ print(mSource);
       };
       print('Picker value : ${selectedPicker.value?['username']}');
       final createdPickList = await _sapB1Service.createPickList(
-        newPickListPayload,itemcontroller.selectedWarehouseFilter.value
+        newPickListPayload,
+        itemcontroller.selectedWarehouseFilter.value,
       );
       if (createdPickList == '') {
         String platform = '';
@@ -646,31 +731,40 @@ print(mSource);
         } else {
           platform = 'mobile';
         }
-        await _apiService.SendFCM(selectedPicker.value?['username'], platform, 'WMS Apps', 'You have a new pick list', '/wms/#/picklist');
+        await _apiService.SendFCM(
+          selectedPicker.value?['username'],
+          platform,
+          'WMS Apps',
+          'You have a new pick list',
+          '/wms/#/picklist',
+        );
         Get.snackbar(
           "Success",
           "Generated Picklist Successfully",
           backgroundColor: Colors.green,
-          colorText: Colors.white, 
+          colorText: Colors.white,
         );
-        fetchPickableItems(reset: true); // Refresh list setelah Pick List berhasil dibuat
+        fetchPickableItems(
+          reset: true,
+        ); // Refresh list setelah Pick List berhasil dibuat
       } else {
         errorMessage.value = createdPickList; // Gunakan pesan error dari API
         Get.snackbar(
           "Error",
           errorMessage.value,
           backgroundColor: Colors.red,
-          colorText: Colors.white, 
+          colorText: Colors.white,
         );
       }
     } catch (e) {
-      errorMessage.value = 'Terjadi kesalahan saat membuat Pick List: ${e.toString()}';
+      errorMessage.value =
+          'Terjadi kesalahan saat membuat Pick List: ${e.toString()}';
       Get.snackbar(
         "Error",
         'Terjadi kesalahan saat membuat Pick List: ${e.toString()}',
         backgroundColor: Colors.red,
         colorText: Colors.white,
-        duration: const Duration(seconds: 5), 
+        duration: const Duration(seconds: 5),
       );
       print(errorMessage.value);
     } finally {

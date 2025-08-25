@@ -12,360 +12,17 @@ class PicklistDetailPage extends StatelessWidget {
   PicklistDetailPage({super.key, this.isViewOnly = false});
 
   final PicklistController controller = Get.find<PicklistController>();
- final ScrollController _scrollController = ScrollController();
- int? focusIndex;
-
-void focusOnItem(int index) {
-   focusIndex = index;
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          index * 220, // perkiraan tinggi item (atur sesuai tinggi card kamu)
-          duration: const Duration(milliseconds: 500),
-          curve: Curves.easeInOut,
-        );
-      }
-    });
-  }
-
   Future<void> _navigateToScanner() async {
     final result = await Get.to(() => const BarcodeScannerPage());
     if (result != null && result is String && result.isNotEmpty) {
-      final picklist = controller.currentProcessingPicklist.value!;
-      final List<dynamic> lines = picklist['DocumentLine'] ?? [];
-
-      // Ambil semua row dengan ItemCode yang sama
-      final matchingRows =
-          lines.where((line) => line['ItemCode'] == result).toList();
-      if (matchingRows.isEmpty) {
-        Get.snackbar(
-          'Warning',
-          'Scanned item ($result) not found in picklist.',
-          backgroundColor: Colors.orange,
-          colorText: Colors.white,
-          snackPosition: SnackPosition.TOP,
-        );
-        return;
-      }
-
-      final totalNeed = matchingRows.fold<double>(0, (sum, row) {
-        final releasedQty = (row['ReleasedQuantity'] ?? 0).toDouble();
-        final pickedQty = (row['PickedQuantity'] ?? 0).toDouble();
-        final newPickedQty = (row['NewPickedQty'] ?? 0).toDouble();
-        return sum + (releasedQty - pickedQty - newPickedQty);
-      });
-
-      // Ambil info tambahan dari baris pertama
-      final itemName = matchingRows.first['ItemName'] ?? '';
-      final binLoc = matchingRows.first['BinCode'] ?? '';
-      final itemCode = result;
-
-      if (totalNeed == 0) {
-        Get.snackbar(
-          'Warning',
-          'Scanned item ($result) maximum quantity.',
-          backgroundColor: Colors.orange,
-          colorText: Colors.white,
-          snackPosition: SnackPosition.TOP,
-        );
-        return;
-      }
-
-      showDistributionDialog(
-        Get.context!,
-        itemCode,
-        itemName,
-        binLoc,
-        totalNeed.toInt(),
-        matchingRows.map((row) {
-          final releasedQty = (row['ReleasedQuantity'] ?? 0).toDouble();
-          final pickedQty = (row['PickedQuantity'] ?? 0).toDouble();
-          final newPickedQty = (row['NewPickedQty'] ?? 0).toDouble();
-          return {
-            'row': row['OrderEntry'] ?? '',
-            'qty': (releasedQty - pickedQty - newPickedQty).toInt(),
-            'ref': row, // simpan referensi asli untuk update nanti
-          };
-        }).toList(),
-        0, // default inputQty awalnya 0, nanti user isi di modal
-      );
-
-      //REQ 20240814.. munculin modal dan input qty
-      //controller.processScannedItem(result);
+      // print(result);
+      controller.processScannedItem(result);
     }
   }
 
-  void showDistributionDialog(
-    BuildContext context,
-    String itemCode,
-    String itemName,
-    String binLocation,
-    int totalNeeded,
-    List<Map<String, dynamic>> rows,
-    int inputQty,
-  ) {
-    int remaining = inputQty;
-
-    List<Map<String, dynamic>> updatedRows =
-        rows.map((row) {
-          int allocate = 0;
-          if (remaining > 0) {
-            int available = row['qty'] ?? 1;
-            allocate = remaining >= available ? available : remaining;
-            remaining -= allocate;
-            if(allocate==0)
-            {
-              allocate=1;
-            }
-          }
-          return {...row, 'allocated': allocate};
-        }).toList();
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // HEADER
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: const BoxDecoration(
-                  color: Colors.blue,
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(8),
-                    topRight: Radius.circular(8),
-                  ),
-                ),
-                child: const Text(
-                  'Distribusi Qty',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-
-              // BODY
-              Container(
-                color: Colors.white,
-                padding: const EdgeInsets.all(16),
-                child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Item Code: $itemCode'),
-                      Text('Item Name: $itemName'),
-                      Text('Bin Location: $binLocation'),
-                      Text('Total Needed: $totalNeeded'),
-                      const SizedBox(height: 10),
-                      const Divider(),
-                      Column(
-                        children: updatedRows.asMap().entries.map((entry) {
-                          int index = entry.key;
-                          var row = entry.value;
-
-                          // kalau value belum ada, default ke 1
-                          row['allocated'] ??= 1;
-                          final controller = TextEditingController(
-                                text: row['allocated'].toString(),
-                              );
-
-                          return Visibility(
-                            visible: index == 0, // hanya tampilkan untuk index 0
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 6),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  // tombol minus
-                                  IconButton(
-                                    icon: const Icon(Icons.remove_circle_outline,color: Colors.red,),
-                                    onPressed: () {
-                                      if (row['allocated'] > 1) {
-                                        row['allocated'] = row['allocated'] - 1;
-                                         controller.text =
-                                              row['allocated'].toString();
-                                      }
-                                    },
-                                  ),
-
-                                  // input angka
-                                  Expanded(
-                                    child: TextFormField(
-                                      // initialValue: row['allocated'].toString(),
-                                      controller: controller,
-                                      keyboardType: TextInputType.number,
-                                      textAlign: TextAlign.center,
-                                      decoration: const InputDecoration(
-                                        isDense: true,
-                                        contentPadding: EdgeInsets.symmetric(vertical: 6, horizontal: 12),
-                                        border: OutlineInputBorder(),
-                                      ),
-                                      onChanged: (val) {
-                                        row['allocated'] = int.tryParse(val) ?? 1;
-                                      },
-                                    ),
-                                  ),
-
-                                  // tombol plus
-                                  IconButton(
-                                    icon: const Icon(Icons.add_circle_outline_outlined,color: Colors.green,),
-                                    onPressed: () {
-                                      row['allocated'] = row['allocated'] + 1;
-                                       controller.text =
-                                              row['allocated'].toString();
-                                    },
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      )
-
-
-                      // Column(
-                      //   children: updatedRows.asMap().entries.map((entry) {
-                      //     int index = entry.key;
-                      //     var row = entry.value;
-
-                      //     return Visibility(
-                      //       visible: index == 0, // hanya tampilkan field untuk index 0, sisanya disembunyikan
-                      //       child: Padding(
-                      //         padding: const EdgeInsets.symmetric(vertical: 6),
-                      //         child: TextFormField(
-                      //           initialValue:   row['allocated'].toString(),
-                      //           keyboardType: TextInputType.number,
-                      //           textAlign: TextAlign.center,
-                      //           decoration: const InputDecoration(
-                      //             isDense: true,
-                      //             contentPadding: EdgeInsets.symmetric(vertical: 6, horizontal: 12),
-                      //             border: OutlineInputBorder(),
-                      //           ),
-                      //           onChanged: (val) {
-                      //             row['allocated'] = int.tryParse(val) ?? 0;
-                      //           },
-                      //         ),
-                      //       ),
-                      //     );
-                      //   }).toList(),
-                      // ),
-
-                      // Column(
-                      //   children:
-                      //       updatedRows.map((row) {
-                      //         return Padding(
-                      //           padding: const EdgeInsets.symmetric(
-                      //             vertical: 6,
-                      //           ),
-                      //           child: Column(
-                      //             crossAxisAlignment: CrossAxisAlignment.start,
-                      //             children: [
-                      //               TextFormField(
-                      //                 initialValue: row['allocated'].toString(),
-                      //                 keyboardType: TextInputType.number,
-                      //                 textAlign: TextAlign.center,
-                      //                 decoration: const InputDecoration(
-                      //                   isDense: true,
-                      //                   contentPadding: EdgeInsets.symmetric(
-                      //                     vertical: 6,
-                      //                     horizontal: 12,
-                      //                   ),
-                      //                   border: OutlineInputBorder(),
-                      //                 ),
-                      //                 onChanged: (val) {
-                      //                   row['allocated'] =
-                      //                       int.tryParse(val) ?? 0;
-                      //                 },
-                      //               ),
-                      //             ],
-                      //           ),
-                      //         );
-                      //       }).toList(),
-                      // ),
-                    ],
-                  ),
-                ),
-              ),
-
-              // FOOTER
-              const Divider(height: 1),
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text("Tutup"),
-                    ),
-                    const SizedBox(width: 8),
-                    ElevatedButton(
-                      onPressed: () {
-                        for (var row in updatedRows) {
-                          controller.updatePickedQtyByItemCode(
-                            itemCode,
-                            row['allocated'].toDouble(),
-                          );
-                        }
-                        // updatePickedQtyByItemCode(itemCode,row['allocated']);
-                        Navigator.pop(context);
-
-                        final picklist = controller.currentProcessingPicklist.value!;
-                      final picklistLines = picklist['DocumentLine'] ?? [];
-
-                      // cari index itemCode terakhir yang discan
-                      int savedIndex = picklistLines.indexWhere(
-                        (line) => line['ItemCode'] == itemCode,
-                      );
-
-                      // kalau ga ketemu atau item paling bawah -> scroll ke paling bawah
-                      if (savedIndex == -1) {
-                        savedIndex = picklistLines.length - 1;
-                      }
-
-                      Future.delayed(const Duration(milliseconds: 300), () {
-                        focusOnItem(savedIndex);
-                      });
-
-                      },
-                      child: const Text("Simpan"),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
- 
   @override
   Widget build(BuildContext context) {
-    return  WillPopScope(
-  onWillPop: () async {
-    // Reset semua newPicked sebelum keluar page
-    var picklist = controller.currentProcessingPicklist.value;
-    if (picklist == null) {
-          return true;
-        } 
-     final List<dynamic> picklistLines = picklist['DocumentLine'] ?? [];
-    for (var line in picklistLines) {
-      line['NewPickedQty'] = 0;
-    }
- 
-    // Kembalikan true supaya page bisa pop
-    return true;
-  },
-  child: Scaffold(
+    return Scaffold(
       appBar: AppBar(
         title: Obx(
           () => Text(
@@ -416,12 +73,8 @@ void focusOnItem(int index) {
           return const Center(child: Text('No picklist selected.'));
         }
 
-        final picklistLines =
-              (picklist['DocumentLine'] ?? []).map((e) => e).toList()..sort(
-                (a, b) => (a["Bin_Loc"] ?? "").toString().compareTo(
-                  (b["Bin_Loc"] ?? "").toString(),
-                ),
-              );
+        final List<dynamic> picklistLines = picklist['DocumentLine'] ?? [];
+
         return Column(
           children: [
             Padding(
@@ -455,7 +108,6 @@ void focusOnItem(int index) {
             ),
             Expanded(
               child: ListView.builder(
-                controller: _scrollController,
                 itemCount: picklistLines.length,
                 itemBuilder: (context, lineIndex) {
                   final line = picklistLines[lineIndex];
@@ -480,13 +132,9 @@ void focusOnItem(int index) {
                       vertical: 4,
                       horizontal: 16,
                     ),
-                    
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                       border: (releasedQty == newPicked) 
-                        ? Border.all(color: Colors.green.shade400, width: 4) 
-                        : null,
+                      borderRadius: BorderRadius.circular(12),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black12,
@@ -503,9 +151,7 @@ void focusOnItem(int index) {
                           width: double.infinity,
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: (releasedQty == newPicked) 
-                                ?  Colors.green.shade400
-                                : Colors.lightBlue.shade400, 
+                            color: Colors.lightBlue.shade400,
                             borderRadius: const BorderRadius.only(
                               topLeft: Radius.circular(12),
                               topRight: Radius.circular(12),
@@ -533,9 +179,6 @@ void focusOnItem(int index) {
                               Text(
                                 'Stock On Hand: ${stockOnHand.toStringAsFixed(0)}',
                               ),
-                                Text(
-                                'UOM : ${line['MeasureUnit'] ?? '-'}',
-                              ),
                               Text(
                                 'Qty Order: ${orderQty.toStringAsFixed(0)}',
                                 style: const TextStyle(color: Colors.blue),
@@ -549,43 +192,40 @@ void focusOnItem(int index) {
                                 style: const TextStyle(color: Colors.orange),
                               ),
                               const Divider(),
-                             isViewOnly
-                                ? const SizedBox.shrink()
-                                :  Row(
+                              Row(
                                 children: [
                                   const Text('Picked Qty: '),
                                   const SizedBox(width: 8),
-                                  // InkWell(
-                                    
-                                  //   onTap:
-                                  //       isViewOnly
-                                  //           ? null
-                                  //           : () {
-                                  //             controller.updatePickedQuantity(
-                                  //               lineIndex,
-                                  //               newPicked - 1,
-                                  //             );
-                                  //           },
-                                  //   child: Container(
-                                  //     padding: const EdgeInsets.all(8),
-                                  //     decoration: BoxDecoration(
-                                  //       color:
-                                  //           isViewOnly
-                                  //               ? Colors.grey[200]
-                                  //               : Colors.blue[700],
-                                  //       borderRadius: BorderRadius.circular(8),
-                                  //     ),
-                                  //     child: Icon(
-                                  //       Icons.remove,
-                                  //       size: 20,
-                                  //       color:
-                                  //           isViewOnly
-                                  //               ? Colors.grey[600]
-                                  //               : Colors.white,
-                                  //     ),
-                                  //   ),
-                                  // ),
-                                  // const SizedBox(width: 8),
+                                  InkWell(
+                                    onTap:
+                                        isViewOnly
+                                            ? null
+                                            : () {
+                                              controller.updatePickedQuantity(
+                                                lineIndex,
+                                                newPicked - 1,
+                                              );
+                                            },
+                                    child: Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color:
+                                            isViewOnly
+                                                ? Colors.grey[200]
+                                                : Colors.blue[700],
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Icon(
+                                        Icons.remove,
+                                        size: 20,
+                                        color:
+                                            isViewOnly
+                                                ? Colors.grey[600]
+                                                : Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
                                   Expanded(
                                     child: TextField(
                                       keyboardType: TextInputType.number,
@@ -602,8 +242,7 @@ void focusOnItem(int index) {
                                                   double.tryParse(value) ?? 0.0,
                                                 );
                                               },
-                                      // readOnly: isViewOnly,
-                                      readOnly: true,
+                                      readOnly: isViewOnly,
                                       decoration: InputDecoration(
                                         isDense: true,
                                         filled: true,
@@ -635,7 +274,7 @@ void focusOnItem(int index) {
                                             : () {
                                               controller.updatePickedQuantity(
                                                 lineIndex,
-                                                0,
+                                                newPicked + 1,
                                               );
                                             },
                                     child: Container(
@@ -644,49 +283,19 @@ void focusOnItem(int index) {
                                         color:
                                             isViewOnly
                                                 ? Colors.grey[200]
-                                                : Colors.red[700],
+                                                : Colors.blue[700],
                                         borderRadius: BorderRadius.circular(8),
                                       ),
                                       child: Icon(
-                                        Icons.clear,
+                                        Icons.add,
                                         size: 20,
                                         color:
                                             isViewOnly
-                                                ? Colors.red[600]
+                                                ? Colors.grey[600]
                                                 : Colors.white,
                                       ),
                                     ),
                                   ),
-                                  // const SizedBox(width: 8),
-                                  // InkWell(
-                                  //   onTap:
-                                  //       isViewOnly
-                                  //           ? null
-                                  //           : () {
-                                  //             controller.updatePickedQuantity(
-                                  //               lineIndex,
-                                  //               newPicked + 1,
-                                  //             );
-                                  //           },
-                                  //   child: Container(
-                                  //     padding: const EdgeInsets.all(8),
-                                  //     decoration: BoxDecoration(
-                                  //       color:
-                                  //           isViewOnly
-                                  //               ? Colors.grey[200]
-                                  //               : Colors.blue[700],
-                                  //       borderRadius: BorderRadius.circular(8),
-                                  //     ),
-                                  //     child: Icon(
-                                  //       Icons.add,
-                                  //       size: 20,
-                                  //       color:
-                                  //           isViewOnly
-                                  //               ? Colors.grey[600]
-                                  //               : Colors.white,
-                                  //     ),
-                                  //   ),
-                                  // ),
                                 ],
                               ),
                             ],
@@ -882,7 +491,7 @@ void focusOnItem(int index) {
                                   : controller.completePicklist,
                           icon: const Icon(Icons.check_circle),
                           label: Text(
-                            isViewOnly ? 'Open Picklist' : 'Complete Picklist',
+                            isViewOnly ? 'Open Picklist' : 'Complete Pick',
                           ),
                           style: ElevatedButton.styleFrom(
                             backgroundColor:
@@ -916,7 +525,6 @@ void focusOnItem(int index) {
           ],
         );
       }),
-    ),
     );
   }
 }

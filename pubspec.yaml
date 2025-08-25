@@ -4,7 +4,7 @@ description: "Warehouse Management System (WMS) for SMP"
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
  
-version: 1.0.0 
+version: 1.0.1
 
 environment:
   sdk: ^3.7.2 
@@ -45,7 +45,9 @@ dependencies:
   network_info_plus: ^6.1.4
   encrypt: ^5.0.3
   connectivity_plus: ^6.1.4
-  package_info_plus: ^8.3.0 
+  package_info_plus: ^8.3.0  
+  scrollable_positioned_list: ^0.3.8
+
   # qr_code_scanner: ^1.0.1
  
 flutter_icons:

@@ -38,7 +38,7 @@ _subscription = _connectivity.onConnectivityChanged.listen((List<ConnectivityRes
   Future<void> _initialCheck() async {
     final result = await _connectivity.checkConnectivity();
     final hasInternet = await _checkConnection();
-    print (hasInternet);
+    //print (hasInternet);
     isConnected.value = result != ConnectivityResult.none && hasInternet;
   }
  
@@ -56,10 +56,10 @@ Future<bool> _checkConnection() async {
       headers: {"User-Agent": "Mozilla/5.0"},
     ).timeout(Duration(seconds: 10));
 
-    print("Status: ${response.statusCode}");
+   // print("Status: ${response.statusCode}");
     return response.statusCode == 200;
   } catch (e) {
-    print("Error checking connection: $e");
+   // print("Error checking connection: $e");
     return false;
   }
 }

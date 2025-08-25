@@ -260,7 +260,7 @@ class LoginController extends GetxController {
     if (response.statusCode == 200) {
       return;
     } else {
-      print("Gagal kirim: ${response.statusCode} - ${response.body}");
+      //print("Gagal kirim: ${response.statusCode} - ${response.body}");
       var err = json.decode(response.body);
       return (err);
     }
